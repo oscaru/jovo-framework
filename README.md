@@ -68,7 +68,11 @@ $ npm install -g jovo-cli
 Create a new Jovo project:
 
 ```sh
+# Default: Create new JavaScript project
 $ jovo new <directory>
+
+# Alternative: Create new TypeScript project
+$ jovo new <directory> --language typescript
 ```
 
 ## Features
@@ -81,7 +85,7 @@ Name | Description | Docs
 :--- | :--- | :---
 Command Line Tools | Create and run Jovo projects from your command line | [📝](./docs/workflows/cli)
 Routing | Easy routing capabilities for intents and states | [📝](./docs/basic-concepts/routing)
-Data input | Deal with user specific data and request parameters (slots and entities) easily| [📝](./docs/basic-concepts/data)
+Data input | Deal with user specific data and request parameters (slots and entities) easily | [📝](./docs/basic-concepts/data)
 Speech and visual output &nbsp; | Craft your responses, including speech an visual elements | [📝](./docs/basic-concepts/output)
 
 
@@ -89,6 +93,7 @@ Speech and visual output &nbsp; | Craft your responses, including speech an visu
 
 Name | Description | Docs
 :--- | :--- | :---
+Input Validation | Define and execute different methods of validation for your user's inputs | [📝](./docs/basic-concepts/routing/input.md#validation)
 User object | Create contextual experiences with user specific data and services | [📝](./docs/basic-concepts/data/user.md)
 Speech Builder | Helpful class to create speech output and add variety to your responses | [📝](./docs/basic-concepts/output/speechbuilder.md)
 i18n | Create multilingual voice apps | [📝](./docs/basic-concepts/output/i18n.md)
@@ -121,8 +126,10 @@ CanFulfillIntentRequest | Add name-free interaction to your skill and increase y
 Game Engine | Provides the toolset to receive Echo Button events | [📝](./docs/platforms/amazon-alexa/game-engine.md)
 Gadget Controller | Allows you to control the user's Echo Buttons | [📝](./docs/platforms/amazon-alexa/gadget-controller.md)
 In-Skill-Purchasing (ISP) | Allows you to sell premium content | [📝](./docs/platforms/amazon-alexa/in-skill-purchases.md)
+Amazon Pay | Sell physical goods and services through Alexa | [📝](./docs/platforms/amazon-alexa/pay.md)
 Reminders API | Allows you to set reminders for your user | [📝](./docs/platforms/amazon-alexa/reminders.md)
 Settings API | Allows you to get your user's settings information | [📝](./docs/platforms/amazon-alexa/settings.md)
+Proactive Events API | Send proactive events,which work as notifications, to your user | [📝](./docs/platforms/amazon-alexa/proactive-events.md)
 Playback Controller | Process audio player requests coming from, for example, touch controls on Alexa-enabled devices | [📝](./docs/platforms/amazon-alexa/audioplayer.md#playback-controller)
 
 #### Google Assistant
@@ -133,18 +140,8 @@ Google Assistant Cards &nbsp; &nbsp; &nbsp; | Create visual Output for the Googl
 Suggestion Chips | Display buttons to allow your users to quickly reply on mobile phones | [📝](./docs/platforms/google-assistant/visual.md#suggestion-chips)
 Location | Access your user's location data | [📝](./docs/platforms/google-assistant/data.md#location)
 Media Response | Play longform audio | [📝](./docs/platforms/google-assistant/media-response.md)
-
-
-#### Missing
-
-The following features are **not** implemented yet. We appreciate any kind of help and are also happy to assist you, if you have any questions about the core code. You can reach us on [Slack](https://slackin-uwinbxqkfx.now.sh/).
-
-Platform | Feature | Docs
-:--- | :--- | :---
-**Amazon Alexa** | Notifications | [📝](https://developer.amazon.com/docs/alexa-voice-service/notifications-overview.html)
-**Google Action** | Transactions | [📝](https://developers.google.com/actions/transactions/)
-&nbsp; | Push Notifications | [📝](https://developers.google.com/actions/assistant/updates/notifications)
-&nbsp; | Android Link | [📝](https://developers.google.com/actions/assistant/helpers#android_link)
+Push Notifications | Send push notifications to your users | [📝](./docs/platforms/google-assistant/notifications.md)
+Transactions | Sell digital and physical goods in your Google Actions | [📝](./docs/platforms/google-assistant/transactions.md)
 
 ### Integrations
 
@@ -172,6 +169,14 @@ Dashbot | Chatbot and Voice App Analytics including Usage Metrics, Behavior Flow
 Bespoken Analytics | Voice App Analytics including Usage Metrics, Logging, and Monitoring | [📝](./docs/integrations/analytics/bespoken.md)
 Chatbase | Voice App Analytics including Usage Metrics, Session Flows and Link Tracking | [📝](./docs/integrations/analytics/chatbase.md)
 Botanalytics | AI powered Chatbot Analytics and Voice Analytics | [📝](./docs/integrations/analytics/botanalytics.md)
+VoiceHero | Voice App Analytics including actionable insights, session tracking, custom events, cohorts, usage data and behavior flows to immediately improve in-app experience | [📝](./docs/integrations/analytics/voicehero.md)
+
+#### CMS Integrations
+
+Name | Description | Docs
+:--- | :--- | :---
+Google Sheets | Manage content in a Google Spreadsheet | [📝](./docs/integrations/cms/google-sheets.md)
+Airtable | Manage content using Airtable | [📝](./docs/integrations/cms/airtable.md)
 
 #### CLI Integrations
 
@@ -201,10 +206,10 @@ Find a quickstart guide and comprehensive tutorials here:
 
 
 ## Contributing
-<a href="https://www.codetriage.com/jovotech/jovo-framework" target="_blank"><img src="https://www.codetriage.com/jovotech/jovo-framework/badges/users.svg"></a>
-
+   
 We strongly encourage everyone who wants to help the Jovo development take a look at the following resources:
-* [CONTRIBUTING.md](./.github/CONTRIBUTING.md)
+* [CONTRIBUTING.md](./.github/CONTRIBUTING.md) 
+* [Step by step process](https://github.com/jovotech/jovo-framework/blob/master/docs/advanced-concepts/contributing.md) 
 * Take a look at our [issues](https://github.com/jovotech/jovo-framework/issues)
 * Add your project to [jovotech/builtwithjovo](https://github.com/jovotech/builtwithjovo)
 

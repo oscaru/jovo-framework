@@ -15,6 +15,13 @@ Learn more about Alexa specific features that can be used with the Jovo Framewor
 * [AudioPlayer Skills](#audioplayer-skills)
 * [Skill Events](#skill-events)
 * [CanFulfillIntentRequest](#canfulfillintentrequest)
+* [GameEngine Interface](#gameengine-interface)
+* [GadgetController Interface](#gadgetcontroller-interface)
+* [In-Skill-Purchasing (ISP)](#in-skill-purchasing-isp)
+* [Amazon Pay](#amazon-pay)
+* [Reminders API](#reminders-api)
+* [Settings API](#settings-api)
+* [Proactive Events API](#proactive-events-api)
 * [Playback Controller](#playback-controller)
 
 ## Introduction to Alexa Specific Features
@@ -24,7 +31,13 @@ Learn more about Alexa specific features that can be used with the Jovo Framewor
 You can access the `alexaSkill` object like this:
 
 ```javascript
+// @language=javascript
+
 this.$alexaSkill
+
+// @language=typescript
+
+this.$alexaSkill!
 ```
 ## Routing
 
@@ -63,6 +76,8 @@ For responses that require long processing times, you can use progressive respon
 Here is the official reference by Amazon: [Send the User a Progressive Response](https://developer.amazon.com/docs/custom-skills/send-the-user-a-progressive-response.html).
 
 ```javascript
+// @language=javascript
+
 this.$alexaSkill.progressiveResponse(speech);
 
 // Example
@@ -71,9 +86,20 @@ this.$alexaSkill.progressiveResponse('Processing')
 await dummyApiCall(2000);
 
 this.tell('Text after API call');
+
+// @language=typescript
+
+this.$alexaSkill!.progressiveResponse(speech: string);
+
+// Example
+this.$alexaSkill!.progressiveResponse('Processing')
+    .then(() => this.$alexaSkill!.progressiveResponse('Still processing'));
+await dummyApiCall(2000);
+
+this.tell('Text after API call');
 ```
 
-> Find an example file here: [`appProgressiveResponse.js`](https://github.com/jovotech/jovo-framework-nodejs/tree/v2/examples/01_alexa/progressive-response/src).
+> Find an example file here: [`appProgressiveResponse.js`](https://github.com/jovotech/jovo-framework/blob/master/examples/javascript/01_alexa/progressive-response/src/app.js).
 
 ### Visual Output
 
@@ -105,6 +131,10 @@ this.tell('Text after API call');
 
 > [Find out more about In-Skill-Purchasing here](./in-skill-purchases.md './amazon-alexa/in-skill-purchases')
 
+## Amazon Pay
+
+> [Find out more about Amazon Pay here](./pay.md './amazon-alexa/pay')
+
 ## Reminders API
 
 > [Learn how to use the Reminders API to set reminders for your user](./reminders.md './amazon-alexa/reminders')
@@ -112,6 +142,10 @@ this.tell('Text after API call');
 ## Settings API
 
 > [You can find out more about the Settings API here](./settings.md './amazon-alexa/settings')
+
+## Proactive Events API
+
+> [You can find out more about the Proactive Events API here](./proactive-events.md './amazon-alexa/proactive-events')
 
 ## Playback Controller
 

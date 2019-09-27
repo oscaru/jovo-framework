@@ -1,14 +1,14 @@
+import * as crypto from 'crypto';
+import { BaseApp, Db, ErrorCode, HandleRequest, JovoError, JovoRequest, JovoResponse, Log, Plugin, PluginConfig, SessionConstants, SessionData } from 'jovo-core';
 
-import {Plugin, BaseApp, SessionData, JovoRequest, PluginConfig, HandleRequest, SessionConstants} from 'jovo-core';
 import _get = require('lodash.get');
 import _set = require('lodash.set');
-import _merge = require('lodash.merge');
 
-import * as path from 'path';
 import * as fs from 'fs';
+import _merge = require('lodash.merge');
+import * as path from 'path';
 import * as io from 'socket.io-client';
 import * as util from 'util';
-import * as crypto from "crypto";
 
 const fsreadFile = util.promisify(fs.readFile);
 const fsreaddir = util.promisify(fs.readdir);
@@ -18,7 +18,12 @@ const fsexists = util.promisify(fs.exists);
 const WEBHOOK_URL = 'https://webhook.jovo.cloud';
 process.on('unhandledRejection', (reason, p) => {
     // Stack Trace
-    console.log(reason.stack);
+    if (reason) {
+        if ((reason as any).stack) {
+            Log.error((reason as any).stack);
+        }
+        Log.error(reason);
+    }
 });
 
 export interface Config extends PluginConfig {
@@ -57,35 +62,54 @@ export interface JovoDebuggerResponse {
 
 export class JovoDebugger implements Plugin {
 
+    private static async getWebhookId(): Promise<string> {
+        let id;
+        try {
+            const content = await fsreadFile(path.join(getUserHome(), '.jovo/config'));
+            id = JSON.parse(content.toString()).webhook.uuid;
+        } catch (e) {
+            Log.warn(`Couldn't load webhook id from jovo-cli config`);
+            throw new Error(`Couldn't initialize jovo debugger`);
+        }
+        return id;
+    }
+
     config: Config = {
-        enabled: false,
         database: true,
+        debuggerJsonPath: './../debugger.json',
+        enabled: false,
         languageModel: true,
         languageModelDir: './../models',
-        debuggerJsonPath: './../debugger.json',
     };
     app?: BaseApp;
     socket?: SocketIOClient.Socket;
     consoleLogOverriden = false;
+
     constructor(config?: Config) {
 
         if (config) {
             this.config = _merge(this.config, config);
         }
-    }
-
-    async install(app: BaseApp) {
-        app.on('webhook.init', async () => {
-            if (['--intent', '--launch', '--file', '--template'].some(r => process.argv.includes(r))) {
-                handleConsoleRequest(app);
-            }
-        });
 
         if (process.argv.indexOf('--jovo-webhook') > -1 && process.argv.indexOf('--disable-jovo-debugger') === -1) {
             this.config.enabled = true;
         }
-        if (!this.config.enabled) {
 
+        // e.g. npm run launch
+        if (process.argv.indexOf('--webhook') > -1 && [ '--intent', '--launch', '--file', '--template' ].some(r => process.argv.includes(r))) {
+            this.config.enabled = true;
+
+        }
+    }
+
+    async install(app: BaseApp) {
+        app.on('webhook.init', async () => {
+            if ([ '--intent', '--launch', '--file', '--template' ].some(r => process.argv.includes(r))) {
+                handleConsoleRequest(app);
+            }
+        });
+
+        if (!this.config.enabled) {
             return;
         }
 
@@ -96,7 +120,7 @@ export class JovoDebugger implements Plugin {
         }
 
         this.app = app;
-        const self = this;
+        const self = this; // tslint:disable-line:no-this-assignment
         self.consoleLogOverriden = false;
         // fired when debugger is opened in browser
         this.socket.on('readyToDebug', this.readyToDebug.bind(this));
@@ -111,31 +135,30 @@ export class JovoDebugger implements Plugin {
     }
 
     private async sendRequest(obj: any) { // tslint:disable-line
-        const userId:string = obj.userId || 'jovo-debugger-user';
+        const userId: string = obj.userId || 'jovo-debugger-user';
         let conv;
 
         if (!this.app) {
             throw new Error(`Couldn't send request. App object is not initialized.`);
         }
 
-        const platformMap: {[key: string]: string} = {
+        const platformMap: { [ key: string ]: string } = {
             'AlexaSkill': 'Alexa',
             'GoogleAction': 'GoogleAssistant',
             'GoogleActionDialogFlowV2': 'GoogleAssistant',
         };
 
-        obj.platform = platformMap[obj.platform];
-        const platform = this.app.getPlatformByName(obj.platform ) || this.app.$platform.values().next().value;
+        obj.platform = platformMap[ obj.platform ];
+        const platform = this.app.getPlatformByName(obj.platform) || this.app.$platform.values().next().value;
         const test = platform.makeTestSuite();
         const fileDbPath = _get(this.app.$plugins.get('FileDb'), 'config.pathToFile');
 
         conv = _get(this, `conversations.${userId}`) ||
-                test.conversation({
-                    userId,
-                    defaultDbDirectory: fileDbPath
-                });
+            test.conversation({
+                defaultDbDirectory: fileDbPath,
+                userId,
+            });
         let req: JovoRequest = await test.requestBuilder.launch();
-
         // raw json request, usually on resend
         if (obj.type === 'RAW') {
             // type of request builder doesn't matter here
@@ -149,17 +172,17 @@ export class JovoDebugger implements Plugin {
                 req = await test.requestBuilder.end();
             } else if (obj.type === 'AUDIOPLAYER') {
                 // TODO: workaround
-                if (obj.platform === 'AlexaSkill') {
+                if (obj.platform === 'AlexaSkill' || obj.platform === 'Alexa') {
                     const offsetInMilliSeconds = Math.round(obj.options.currentTime * 1000);
 
-                    const types: {[key: string]: string} = {
-                        finished: 'AudioPlayer.Finished',
+                    const types: { [ key: string ]: string } = {
+                        finished: 'AudioPlayer.PlaybackFinished',
                         nearlyfinished: 'AudioPlayer.PlaybackNearlyFinished',
                         paused: 'AudioPlayer.PlaybackStopped',
                         started: 'AudioPlayer.PlaybackStarted',
                     };
                     req = await test.requestBuilder.audioPlayerRequest();
-                    _set(req, 'request.type', types[obj.options.type] || '');
+                    _set(req, 'request.type', types[ obj.options.type ] || '');
                     _set(req, 'request.offsetInMilliseconds', offsetInMilliSeconds);
 
                 } else if (obj.platform === 'GoogleAction') {
@@ -175,7 +198,7 @@ export class JovoDebugger implements Plugin {
                 // alexa only
                 req.setTimestamp((new Date()).toISOString());
             } catch (e) {
-
+                // ignore error here
             }
 
             // set locale (not available for every request)
@@ -183,6 +206,7 @@ export class JovoDebugger implements Plugin {
                 req.setLocale(obj.locale);
                 conv.config.locale = obj.locale;
             } catch (e) {
+                // ignore error here
             }
 
             // TODO: needs refactoring
@@ -196,11 +220,11 @@ export class JovoDebugger implements Plugin {
                     req.setAudioInterface();
                 }
             } catch (e) {
-
+                // ignore error here
             }
         }
 
-        delete conv.config.httpOptions.headers['jovo-test'];
+        delete conv.config.httpOptions.headers[ 'jovo-test' ];
         const response = await conv.send(req);
 
         _set(this, `conversations.${userId}`, conv);
@@ -210,7 +234,7 @@ export class JovoDebugger implements Plugin {
 
     private async askForLanguageModelEmit(): Promise<void> {
         if (!this.config.languageModel) {
-            //TODO: emit with message to activate languagemodel
+            // TODO: emit with message to activate languagemodel
             return;
         }
 
@@ -229,7 +253,28 @@ export class JovoDebugger implements Plugin {
         const languageModelDirExists = await fsexists(this.config.languageModelDir);
 
         if (!languageModelDirExists) {
-            console.log(`Can't find models folder`);
+
+            // changes default language model directory when the project is in typescript
+            const DEFAULT_LANGUAGE_MODEL_DIR = './../models';
+            if (this.config.languageModelDir === DEFAULT_LANGUAGE_MODEL_DIR &&
+                process.cwd().indexOf('\\dist\\') > -1 || process.cwd().indexOf('/dist/') > -1) {
+                this.config.languageModelDir = this.config.languageModelDir.replace('./../', './../../');
+            }
+            const tsLanguageModelDirExists = await fsexists(this.config.languageModelDir);
+
+            if (!tsLanguageModelDirExists) {
+                Log.warn(`Can't find models folder`);
+                Log.warn('Defaultfolder: /project/models');
+                Log.warn();
+                Log.warn('You can set a custom folder:');
+                Log.warn(`
+                    app.use(
+                        new JovoDebugger({
+                                languageModelDir: '<dir>'
+                            });
+                    )`);
+            }
+
             return;
         }
 
@@ -237,31 +282,29 @@ export class JovoDebugger implements Plugin {
 
 
         const files = await fsreaddir(this.config.languageModelDir);
-
         for (const file of files) {
             if (!file.endsWith('.json')) {
                 continue;
             }
             const locale = file.substring(0, file.indexOf('.json'));
-            const fileContent:string = await fsreadFile(path.join(
+            const fileContent: string = await fsreadFile(path.join(
                 this.config.languageModelDir,
-                file
+                file,
             ), 'utf8');
 
-            languageModel[locale] = JSON.parse(fileContent);
+            languageModel[ locale ] = JSON.parse(fileContent);
         }
         this.socket.emit('languageModelEmit', languageModel);
 
 
-
         const debuggerConfigExists = await fsexists(this.config.debuggerJsonPath);
         if (debuggerConfigExists) {
-            const fileContent:string = await fsreadFile(this.config.debuggerJsonPath, 'utf8');
+            const fileContent: string = await fsreadFile(this.config.debuggerJsonPath, 'utf8');
 
             try {
                 this.socket.emit('debuggerConfig', JSON.parse(fileContent));
-            } catch(e) {
-                console.error(e);
+            } catch (e) {
+                Log.error(e);
             }
         }
     }
@@ -280,12 +323,13 @@ export class JovoDebugger implements Plugin {
             return;
         }
 
-        const _privateLog = console.log;
+        const oldConsoleLog = console.log; // tslint:disable-line:no-console
 
-        console.log = function(message) { // tslint:disable-line
+        console.log = function (message) { // tslint:disable-line
             const nMessage = typeof message !== 'string' ? JSON.stringify(message) : message;
             socket.emit('console.log', nMessage, (new Error()).stack!.toString());
-            _privateLog.apply(console, arguments); // eslint-disable-line
+            // @ts-ignore
+            oldConsoleLog.apply(console, arguments); // eslint-disable-line
         };
         this.consoleLogOverriden = true;
     }
@@ -299,12 +343,12 @@ export class JovoDebugger implements Plugin {
         }
 
         const request: JovoDebuggerRequest = {
+            inputs: handleRequest.jovo.$inputs,
             json: handleRequest.jovo.$request,
             platformType: handleRequest.jovo.constructor.name,
             requestSessionAttributes: handleRequest.jovo.$requestSessionAttributes,
-            inputs: handleRequest.jovo.$inputs,
-            userId: handleRequest.jovo.$user.getId() || '',
             route: handleRequest.jovo.$plugins.Router.route,
+            userId: handleRequest.jovo.$user.getId() || '',
         };
 
         if (this.config.database) {
@@ -315,15 +359,18 @@ export class JovoDebugger implements Plugin {
         try {
             request.rawText = handleRequest.jovo.getRawText();
         } catch (e) {
+            // ignore error here
         }
 
         try {
             // TODO: googleAction?
             // request.error = handleRequest.jovo.$request.getError();
         } catch (e) {
+            // ignore error here
         }
         this.socket.emit('requestEmit', request);
     }
+
     private response(handleRequest: HandleRequest) {
         if (!handleRequest.jovo) {
             return;
@@ -332,15 +379,15 @@ export class JovoDebugger implements Plugin {
             throw new Error(`Couldn't initialize socket io.`);
         }
         const response: JovoDebuggerResponse = {
+            inputs: handleRequest.jovo.$inputs,
             json: handleRequest.jovo.$response,
             platformType: handleRequest.jovo.constructor.name === 'GoogleAction' ? 'GoogleActionDialogFlowV2' : handleRequest.jovo.constructor.name, // TODO: TEMP
-            userId: handleRequest.jovo.$user!.getId() || '',
-            route: handleRequest.jovo.$plugins.Router.route,
-            sessionEnded: handleRequest.jovo.$response!.hasSessionEnded(),
-            inputs: handleRequest.jovo.$inputs,
             requestSessionAttributes: handleRequest.jovo.$requestSessionAttributes,
             responseSessionAttributes: _get(handleRequest.jovo, '$session.$data'),
+            route: handleRequest.jovo.$plugins.Router.route,
+            sessionEnded: handleRequest.jovo.$response!.hasSessionEnded(),
             speech: handleRequest.jovo.$response!.getSpeech(),
+            userId: handleRequest.jovo.$user!.getId() || '',
         };
 
         if (this.config.database) {
@@ -351,12 +398,13 @@ export class JovoDebugger implements Plugin {
         try {
             response.speech = handleRequest.jovo.$response!.getSpeech();
         } catch (e) {
+            // ignore error here
         }
 
-        // TODO: audioplayer
         try {
-            response.audioplayer = _get(handleRequest.jovo.$output, `${handleRequest.jovo.constructor.name}.AudioPlayer`) || _get(handleRequest.jovo.$output, `${handleRequest.jovo.constructor.name}.MediaResponse`);
+            response.audioplayer = _get(handleRequest.jovo.$output, `Alexa.AudioPlayer`) || _get(handleRequest.jovo.$output, `GoogleAssistant.MediaResponse`);
         } catch (e) {
+            // ignore error here
         }
 
         this.socket.emit('responseEmit', response);
@@ -371,35 +419,23 @@ export class JovoDebugger implements Plugin {
             },
         });
         this.socket.on('connect', () => {
+            // do nothing on connect
         });
 
         this.socket.on('connect_error', (error: Error) => {
-            console.log('Sorry, there seems to be an issue with the connection!');
+            Log.error('Sorry, there seems to be an issue with the connection!');
         });
     }
 
-    private static async getWebhookId(): Promise<string> {
-        let id;
-        try {
-            const content = await fsreadFile(path.join(getUserHome(), '.jovo/config'));
-            id = JSON.parse(content.toString()).webhook.uuid;
-        } catch (e) {
-            console.log(`Couldn't load webhook id from jovo-cli config`);
-            throw new Error(`Couldn't initialize jovo debugger`);
-        }
-        return id;
-    }
-    uninstall(app: BaseApp) {
-
-    }
 }
+
 /**
  * Helper method to find userHome directory
  * @return {*}
  */
 function getUserHome(): string {
     // @ts-ignore
-    return process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'];
+    return process.env[ (process.platform === 'win32') ? 'USERPROFILE' : 'HOME' ];
 }
 
 /**
@@ -437,7 +473,7 @@ async function handleConsoleRequest(app: BaseApp) {
 
     const testSuite = platform.makeTestSuite();
     const conv = testSuite.conversation({
-        defaultDbDirectory: './db/'
+        defaultDbDirectory: './db/',
     });
     try {
         let request = await testSuite.requestBuilder.launch(); // dummy
@@ -452,47 +488,50 @@ async function handleConsoleRequest(app: BaseApp) {
             request = await testSuite.requestBuilder.rawRequest(require(file));
         }
         if (program.template) {
-            request = await testSuite.requestBuilder.rawRequestByKey(program.template)  ;
+            request = await testSuite.requestBuilder.rawRequestByKey(program.template);
         }
 
         if (program.locale) {
             request.setLocale(program.locale);
+            conv.config.locale = program.locale;
         }
 
         if (program.state) {
             request.addSessionAttribute(SessionConstants.STATE, program.state);
             request.setNewSession(false);
+        }
 
-        }
         if (parameters.length > 0) {
-            for (let i = 0; i < parameters.length; i++) {
-                const parameter = parameters[i].split('=');
+            for (let i = 0; i < parameters.length; i++) { // tslint:disable-line:prefer-for-of
+                const parameter = parameters[ i ].split('=');
                 if (parameter.length !== 2) {
-                    console.log('Invalid parameter: ' + parameters[i]);
+                    Log.error('Invalid parameter: ' + parameters[ i ]);
                 } else {
-                    request.addInput(parameter[0], parameter[1]);
+                    request.addInput(parameter[ 0 ], parameter[ 1 ]);
                 }
             }
         }
+
         if (sessions.length > 0) {
-            for (let i = 0; i < sessions.length; i++) {
-                const session = sessions[i].split('=');
+            for (let i = 0; i < sessions.length; i++) { // tslint:disable-line:prefer-for-of
+                const session = sessions[ i ].split('=');
                 if (session.length !== 2) {
-                    console.log('Invalid session: ' + sessions[i]);
+                    Log.error('Invalid session: ' + sessions[ i ]);
                 } else {
-                    request.addSessionAttribute(session[0], session[1]);
+                    request.addSessionAttribute(session[ 0 ], session[ 1 ]);
                 }
             }
         }
+
         if (request) {
             if (conv.config.httpOptions && conv.config.httpOptions.headers) {
-                delete conv.config.httpOptions.headers['jovo-test'];
+                delete conv.config.httpOptions.headers[ 'jovo-test' ];
             }
-            conv.config.userId = `console_debugger_user-${program.platform.toLowerCase()}-${crypto.createHash('md5').update(__dirname).digest("hex")}`;
+            conv.config.userId = `console_debugger_user-${program.platform.toLowerCase()}-${crypto.createHash('md5').update(__dirname).digest('hex')}`;
             await conv.send(request);
         }
     } catch (e) {
-        console.log(e);
+        Log.error(e);
     }
 
 }

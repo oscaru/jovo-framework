@@ -1,6 +1,14 @@
-import {Extensible, HandleRequest, PluginConfig, Plugin, Log} from "jovo-core";
-import {GoogleSheetsCMS} from "./GoogleSheetsCMS";
+import {
+    ErrorCode,
+    Extensible,
+    HandleRequest,
+    JovoError,
+    Log,
+    Plugin,
+    PluginConfig,
+} from 'jovo-core';
 import _merge = require('lodash.merge');
+import { GoogleSheetsCMS } from './GoogleSheetsCMS';
 
 export interface GoogleSheetsSheet extends PluginConfig {
     name?: string;
@@ -10,19 +18,18 @@ export interface GoogleSheetsSheet extends PluginConfig {
     access?: string;
     entity?: string;
     position?: number;
-
+    caching?: boolean;
 }
 
-export class DefaultSheet  implements Plugin {
-
+export class DefaultSheet implements Plugin {
     config: GoogleSheetsSheet = {
+        caching: true,
         enabled: true,
         name: undefined,
         range: 'A:B',
     };
 
     cms?: GoogleSheetsCMS;
-
 
     constructor(config?: GoogleSheetsSheet) {
         if (config) {
@@ -35,28 +42,55 @@ export class DefaultSheet  implements Plugin {
         this.cms = extensible as GoogleSheetsCMS;
         extensible.middleware('retrieve')!.use(this.retrieve.bind(this));
 
-    }
-    uninstall(cms: Extensible) {
-
+        if (this.cms.config.caching === false || this.config.caching === false) {
+            this.cms.baseApp.middleware('request').use(this.retrieve.bind(this));
+        }
     }
 
     async retrieve(handleRequest: HandleRequest) {
         if (!this.cms) {
             return Promise.reject('No cms initialized.');
         }
-        const spreadsheetId = this.config.spreadsheetId || this.cms.config.spreadsheetId;
+        const spreadsheetId =
+            this.config.spreadsheetId || this.cms.config.spreadsheetId;
 
         if (!spreadsheetId) {
-            return Promise.reject('SpreadsheetId has to be set.');
+            return Promise.reject(
+                new JovoError(
+                    'spreadsheetId has to be set.',
+                    ErrorCode.ERR_PLUGIN,
+                    'jovo-cms-googlesheets',
+                    'the spreadsheetId has to be defined in your config.js file',
+                    undefined,
+                    'https://www.jovo.tech/docs/cms/google-sheets#configuration',
+                ),
+            );
         }
         if (!this.config.name) {
-            return Promise.reject('sheet name has to be set.');
+            return Promise.reject(
+                new JovoError(
+                    'sheet name has to be set.',
+                    ErrorCode.ERR_PLUGIN,
+                    'jovo-cms-googlesheets',
+                    'the sheet name has to be defined in your config.js file',
+                    undefined,
+                    'https://www.jovo.tech/docs/cms/google-sheets#configuration',
+                ),
+            );
         }
         if (!this.config.range) {
-            return Promise.reject('range has to be set.');
+            return Promise.reject(
+                new JovoError(
+                    'range has to be set.',
+                    ErrorCode.ERR_PLUGIN,
+                    'jovo-cms-googlesheets',
+                    'the range has to be defined in your config.js file',
+                    undefined,
+                    'https://www.jovo.tech/docs/cms/google-sheets#configuration',
+                ),
+            );
         }
         let values: any[] = []; // tslint:disable-line
-
 
         const access = this.config.access || this.cms.config.access || 'private';
         if (access === 'private') {
@@ -65,13 +99,20 @@ export class DefaultSheet  implements Plugin {
             Log.verbose('Sheet name: ' + this.config.name);
             Log.verbose('Sheet range: ' + this.config.range);
 
-            values = await this.cms.loadPrivateSpreadsheetData(spreadsheetId, this.config.name, this.config.range);  // tslint:disable-line
+            values = await this.cms.loadPrivateSpreadsheetData(
+                spreadsheetId,
+                this.config.name,
+                this.config.range,
+            ); // tslint:disable-line
         } else if (access === 'public') {
             Log.verbose('Retrieving public spreadsheet');
             Log.verbose('Spreadsheet ID: ' + spreadsheetId);
             Log.verbose('Sheet position: ' + this.config.position);
 
-            const publicValues = await this.cms.loadPublicSpreadSheetData(spreadsheetId, this.config.position);  // tslint:disable-line
+            const publicValues = await this.cms.loadPublicSpreadsheetData(
+                spreadsheetId,
+                this.config.position,
+            ); // tslint:disable-line
             values = this.parsePublicToPrivate(publicValues);
         }
         if (values) {
@@ -79,11 +120,19 @@ export class DefaultSheet  implements Plugin {
         }
     }
 
-    parse(handleRequest: HandleRequest, values: any[]) {  // tslint:disable-line
+    parse(handleRequest: HandleRequest, values: any[]) {
+        // tslint:disable-line
         if (!this.config.entity) {
-            throw new Error('Entity has to be set.');
+            throw new JovoError(
+                'entity has to be set.',
+                ErrorCode.ERR_PLUGIN,
+                'jovo-cms-googlesheets',
+                'The sheet\'s name has to be defined in your config.js file.',
+                undefined,
+                'https://www.jovo.tech/docs/cms/google-sheets#configuration',
+            );
         }
-        handleRequest.app.$cms[this.config.entity] = values;
+        handleRequest.app.$cms[ this.config.entity ] = values;
     }
 
     /**
@@ -91,12 +140,23 @@ export class DefaultSheet  implements Plugin {
      * @param values
      * @returns {any[]}
      */
-    private parsePublicToPrivate(values: any) { // tslint:disable-line
+    private parsePublicToPrivate(values: any) {
+        // tslint:disable-line
         const newValues: any[] = []; // tslint:disable-line
         const entries = values.feed.entry;
         const headers: string[] = [];
 
-        entries.forEach((entry: any, index: number) => { // tslint:disable-line
+        if (!entries) {
+            throw new JovoError(
+                'No spreadsheet values found.',
+                ErrorCode.ERR_PLUGIN,
+                'jovo-cms-googlesheets',
+                'It seems like your spreadsheet is empty or without values.',
+            );
+        }
+
+        entries.forEach((entry: any, index: number) => {
+            // tslint:disable-line
             const row: string[] = [];
             // get headers
             if (index === 0) {
@@ -110,13 +170,11 @@ export class DefaultSheet  implements Plugin {
             // get values
             Object.keys(entry).forEach((key: string) => {
                 if (key.startsWith('gsx$')) {
-                    const cell = entry[key];
-                    row.push(cell['$t']);
+                    const cell = entry[ key ];
+                    row.push(cell[ '$t' ]); // tslint:disable-line:no-string-literal
                 }
             });
             newValues.push(row);
-
-
         });
 
         return newValues;

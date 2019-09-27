@@ -1,7 +1,7 @@
-import {Db, BaseApp, PluginConfig, JovoError, ErrorCode} from 'jovo-core';
+import firebase = require('firebase-admin');
+import {BaseApp, Db, ErrorCode, JovoError, PluginConfig} from 'jovo-core';
 import _get = require('lodash.get');
 import _merge = require('lodash.merge');
-import firebase = require('firebase-admin');
 
 export interface Config extends PluginConfig {
     databaseURL?: string;
@@ -11,9 +11,9 @@ export interface Config extends PluginConfig {
 
 export class Firestore implements Db {
     config: Config = {
-        databaseURL: undefined,
         collectionName: 'UserData',
-        credential: undefined
+        credential: undefined,
+        databaseURL: undefined
     };
     needsWriteFileAccess = false;
     isCreating = false;
@@ -35,7 +35,13 @@ export class Firestore implements Db {
             app.$db = this;
         }
 
+        this.initializeFirebaseAdmin();
+        this.initializeFirestore(this.firebaseAdmin);
+    }
+
+    initializeFirebaseAdmin() {
         this.firebaseAdmin = require('firebase-admin');
+
         if (!this.firebaseAdmin) {
             throw new JovoError(
                 'Failed to import the firebase-admin package',
@@ -49,8 +55,10 @@ export class Firestore implements Db {
             credential: this.firebaseAdmin.credential.cert(this.config.credential),
             databaseURL: this.config.databaseURL
         });
+    }
 
-        this.firestore = this.firebaseAdmin.firestore();
+    initializeFirestore(firebaseAdmin: any) { // tslint:disable-line
+        this.firestore = firebaseAdmin.firestore();
         if (!this.firestore) {
             throw new JovoError(
                 'Failed to initialize the firestore object',
@@ -63,10 +71,6 @@ export class Firestore implements Db {
             timestampsInSnapshots: true
         });
     }
-
-    uninstall(app: BaseApp) {
-    }
-
 
     /**
      * Throws JovoError if collectionName, credential or databaseURL was not set inside config.js
@@ -122,16 +126,23 @@ export class Firestore implements Db {
 
 
     /**
-     * Saves object as value for key (default: "userData") inside document (primary key)
+     * Saves data as value for key (default: "userData") inside document (primary key)
      * @param {string} primaryKey
      * @param {string} key
-     * @param {object} data
+     * @param {any} data
      */
-    async save(primaryKey: string, key: string, data: object): Promise<void> {
+    async save(primaryKey: string, key: string, data: any, updatedAt?: string): Promise<void> { // tslint:disable-line
         this.errorHandling();
 
+        const userData = {
+            [key]: data,
+        };
+        if (updatedAt) {
+            userData.updatedAt = updatedAt;
+        }
+
         const docRef: firebase.firestore.DocumentReference = this.firestore!.collection(this.config.collectionName).doc(primaryKey);
-        await docRef.set({ [key]: data }, {merge: true});
+        await docRef.set(userData, {merge: true});
     }
 
 

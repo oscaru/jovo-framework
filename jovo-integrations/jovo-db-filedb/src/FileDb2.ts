@@ -1,22 +1,47 @@
-
-import {Db, PluginConfig} from 'jovo-core';
-import * as path from 'path';
-import * as fs from "fs";
-import _set = require('lodash.set');
+import * as fs from 'fs';
+import { BaseApp, Db, ErrorCode, JovoError, Log, PluginConfig } from 'jovo-core';
 import _merge = require('lodash.merge');
-import {BaseApp} from "jovo-core";
+import _set = require('lodash.set');
+import * as path from 'path';
 
 interface Config extends PluginConfig {
     path?: string;
-    primaryKeyColumn?: string;
 }
 
 export class FileDb2 implements Db {
 
+    /**
+     * Creates paths recursively
+     * @param {string} targetDir
+     * @param {boolean} isRelativeToScript
+     */
+    private static mkDirByPathSync(targetDir: string, isRelativeToScript: boolean) {
+        const sep = path.sep;
+        const initDir = path.isAbsolute(targetDir) ? sep : '';
+        const baseDir = isRelativeToScript ? __dirname : '.';
+
+        targetDir.split(sep).reduce((parentDir, childDir) => {
+            const curDir = path.resolve(baseDir, parentDir, childDir);
+            try {
+                if (!fs.existsSync(curDir)) {
+                    fs.mkdirSync(curDir);
+                    Log.info(`Directory ${curDir} created!`);
+                }
+            } catch (err) {
+                if (err.code !== 'EEXIST') {
+                    throw err;
+                }
+
+                Log.error(`Directory ${curDir} already exists!`);
+            }
+
+            return curDir;
+        }, initDir);
+    }
+
     needsWriteFileAccess = true;
     config: Config = {
         path: './../db/',
-        primaryKeyColumn: 'userId',
     };
 
     constructor(config?: Config) {
@@ -30,17 +55,24 @@ export class FileDb2 implements Db {
     install(app: BaseApp) {
         app.$db = this;
 
-        if (!this.config.path) {
-            throw new Error(`Couldn't install FileDb2 plugin. Path is missing`);
-        }
+        this.errorHandling();
 
-        if (!fs.existsSync(path.join(this.config.path))) {
-            FileDb2.mkDirByPathSync(path.join(this.config.path), false);
+        if (!fs.existsSync(path.join(this.config.path!))) {
+            FileDb2.mkDirByPathSync(path.join(this.config.path!), false);
         }
     }
 
-    uninstall(app: BaseApp) {
-
+    errorHandling() {
+        if (!this.config.path) {
+            throw new JovoError(
+                `Couldn't use FileDb2 plugin. path is missing`,
+                ErrorCode.ERR_PLUGIN,
+                'jovo-db-filedb',
+                'config.path has a falsy value',
+                undefined,
+                'https://www.jovo.tech/docs/databases/file-db'
+            );
+        }
     }
 
     /**
@@ -49,13 +81,11 @@ export class FileDb2 implements Db {
      * @return {Promise<any>}
      */
     async load(primaryKey: string) {
-        if (!this.config.path) {
-            throw new Error(`Couldn't use FileDb2 plugin. Path is missing`);
-        }
+        this.errorHandling();
 
-        const pathToFile = path.join(this.config.path, `${primaryKey}.json`);
+        const pathToFile = path.join(this.config.path!, `${primaryKey}.json`);
         if (!fs.existsSync(pathToFile)) {
-            return Promise.resolve([]);
+            return Promise.resolve(undefined);
         }
 
         const data: any = await this.readFile(pathToFile); // tslint:disable-line
@@ -63,25 +93,36 @@ export class FileDb2 implements Db {
         return Promise.resolve(JSON.parse(data));
     }
 
-    async save(primaryKey: string, key: string, data: any) { // tslint:disable-line
-        if (!this.config.path) {
-            throw new Error(`Couldn't install FileDb2 plugin. Path is missing`);
-        }
+    async save(primaryKey: string, key: string, data: any, updatedAt?: string) { // tslint:disable-line
+        this.errorHandling();
 
-        const pathToFile = path.join(this.config.path, `${primaryKey}.json`);
+        const pathToFile = path.join(this.config.path!, `${primaryKey}.json`);
         if (fs.existsSync(pathToFile)) {
             const oldDataContent = await this.readFile(pathToFile);
             const oldData = JSON.parse(oldDataContent);
             _set(oldData, key, data);
+            if (updatedAt) {
+                oldData.updatedAt = updatedAt;
+            }
+
             return this.saveFile(pathToFile, oldData);
         } else {
-            const newData: any = {}; // tslint:disable-line
-            _set(newData, key, data);
+            const newData = {
+                [key]: data,
+            };
+            if (updatedAt) {
+                newData.updatedAt = updatedAt;
+            }
             return this.saveFile(pathToFile, newData);
         }
     }
 
     async delete(primaryKey: string) {
+        this.errorHandling();
+
+        const pathToFile = path.join(this.config.path!, `${primaryKey}.json`);
+
+        return this.deleteFile(pathToFile);
     }
 
 
@@ -100,7 +141,6 @@ export class FileDb2 implements Db {
         return new Promise<any>((resolve, reject) => { // tslint:disable-line
             fs.writeFile(filename, JSON.stringify(data, null, '\t'), (err) => {
                 if (err) {
-                    console.log(err);
                     return reject(err);
                 }
                 resolve();
@@ -108,33 +148,17 @@ export class FileDb2 implements Db {
         });
     }
 
-    /**
-     * Creates paths recursively
-     * @param {string} targetDir
-     * @param {boolean} isRelativeToScript
-     */
-    private static mkDirByPathSync(targetDir: string, isRelativeToScript: boolean) {
-        const sep = path.sep;
-        const initDir = path.isAbsolute(targetDir) ? sep : '';
-        const baseDir = isRelativeToScript ? __dirname : '.';
-
-        targetDir.split(sep).reduce((parentDir, childDir) => {
-            const curDir = path.resolve(baseDir, parentDir, childDir);
-            try {
-                if (!fs.existsSync(curDir)) {
-                    fs.mkdirSync(curDir);
-                    console.log(`Directory ${curDir} created!`);
+    private async deleteFile(filename: string) {
+        return new Promise<any>((resolve, reject) => { // tslint:disable-line
+            fs.unlink(filename, (err) => {
+                if (err) {
+                    return reject(err);
                 }
-            } catch (err) {
-                if (err.code !== 'EEXIST') {
-                    throw err;
-                }
-
-                console.log(`Directory ${curDir} already exists!`);
-            }
-
-            return curDir;
-        }, initDir);
+                resolve();
+            });
+        });
     }
+
+
 
 }

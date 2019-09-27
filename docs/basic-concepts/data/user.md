@@ -3,13 +3,14 @@
 In this section, you will learn how to use the Jovo User class to persist user specific data and create contextual experiences for your voice apps.
 
 * [Introduction to the User Class](#introduction-to-the-user-class)
-    * [Configuration](#configuration)
+  * [Configuration](#configuration)
 * [Database Integrations](#database-integrations)
-    * [Save Data](#save-data)
-    * [Load Data](#load-data)
-    * [Delete a User](#delete-a-user)
+  * [Save Data](#save-data)
+  * [Load Data](#load-data)
+  * [Delete a User](#delete-a-user)
 * [Meta Data](#meta-data)
 * [Context](#context)
+* [UpdatedAt](#updatedat)
 * [User ID](#user-id)
 * [Locale](#locale)
 
@@ -30,6 +31,8 @@ There are certain configurations that can be changed when dealing with the user 
 ```javascript
 // config.js file
 user: {
+    updatedAt: false,
+    dataCaching: false,
     implicitSave: true,
     metaData: {
         enabled: false,
@@ -65,6 +68,38 @@ user: {
 > [Learn more about all available database integrations here](../../integrations/databases '../databases').
 
 The Jovo User object uses [database integrations](../../integrations/databases '../databases') to persist data across sessions. By default, the [file-based system](../../integrations/databases/file-db '../databases/file-db') will be used so you can start right away when prototyping locally.
+
+Also, by default the framework will write to the database with every user interaction (request & response). To enable data caching, i.e. only write to the database if the state of it has changed between the request and the response, you have to add the following to your configuration file:
+
+```javascript
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        dataCaching: true
+    },
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        dataCaching: true
+    },
+
+    // ...
+
+};
+```
 
 Below, learn more about operations you can do for user-specific data:
 
@@ -118,28 +153,84 @@ sessionsCount | `this.$user.$metaData.sessionsCount` | Timestamp: How often your
 You can enable meta data like this:
 
 ```javascript
-// config.js file
-user: {
-    metaData: {
-        enabled: true,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        metaData: {
+            enabled: true,
+        },
     },
-},
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        metaData: {
+            enabled: true,
+        },
+    },
+
+    // ...
+
+};
 ```
 
 You can also overwrite any other of the default configurations:
 
+
 ```javascript
-// config.js file
-user: {
-    metaData: {
-        enabled: false,
-        lastUsedAt: true,
-        sessionsCount: true,
-        createdAt: true,
-        requestHistorySize: 4,
-        devices: true,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        metaData: {
+            enabled: false,
+            lastUsedAt: true,
+            sessionsCount: true,
+            createdAt: true,
+            requestHistorySize: 4,
+            devices: true,
+        },
     },
-},
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        metaData: {
+            enabled: false,
+            lastUsedAt: true,
+            sessionsCount: true,
+            createdAt: true,
+            requestHistorySize: 4,
+            devices: true,
+        },
+    },
+
+    // ...
+
+};
 ```
 
 
@@ -150,12 +241,37 @@ The user context is used to automatically store data from past interaction pairs
 User context can be enabled like this:
 
 ```javascript
-// config.js file
-user: {
-    context: {
-        enabled: true,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        context: {
+            enabled: true,
+        },
     },
-},
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        context: {
+            enabled: true,
+        },
+    },
+
+    // ...
+
+};
 ```
 
 This works like pagination. The most recent request and response pair is stored at `this.$user.$context.prev[0]`.
@@ -175,57 +291,202 @@ Response | speech | `this.$user.$context.prev[i].response.speech` |  `this.$user
 The default configuration looks like this:
 
 ```javascript
-// config.js file
-user: {
-    context: {
-        enabled: false,
-        prev: {
-            size: 1,
-            request: {
-                intent: true,
-                state: true,
-                inputs: true,
-                timestamp: true,
-            },
-            response: {
-                speech: true,
-                reprompt: true,
-                state: true,
-                output: true,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        context: {
+            enabled: false,
+            prev: {
+                size: 1,
+                request: {
+                    intent: true,
+                    state: true,
+                    inputs: true,
+                    timestamp: true,
+                },
+                response: {
+                    speech: true,
+                    reprompt: true,
+                    state: true,
+                    output: true,
+                },
             },
         },
     },
-},
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        context: {
+            enabled: false,
+            prev: {
+                size: 1,
+                request: {
+                    intent: true,
+                    state: true,
+                    inputs: true,
+                    timestamp: true,
+                },
+                response: {
+                    speech: true,
+                    reprompt: true,
+                    state: true,
+                    output: true,
+                },
+            },
+        },
+    },
+
+    // ...
+
+};
 ```
 
 You can freely adjust how many of these request-response pairs should be saved by changing the array `size` in your app's config to an Integer equal to or bigger than 0.
 
 ```javascript
-const config = {
-    userContext: {
-        prev: {
-            size: 3,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        context: {
+            prev: {
+                size: 3,
+            },
         },
     },
-    // Other configurations
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        context: {
+            prev: {
+                size: 3,
+            },
+        },
+    },
+
+    // ...
+
 };
 ```
 
 You can also decide what you want to save and what not. Simply change the value of the unwanted data to `false`:
+
 ```javascript
-const config = {
-    userContext: {
-        prev: {
-            size: 1,
-            request: {
-                timestamp: false,
-            },
-            response: {
-                state: false,
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    
+    user: {
+        context: {
+            prev: {
+                size: 1,
+                request: {
+                    timestamp: false,
+                },
+                response: {
+                    state: false,
+                },
             },
         },
     },
-    // Other configurations
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    
+    user: {
+        context: {
+            prev: {
+                size: 1,
+                request: {
+                    timestamp: false,
+                },
+                response: {
+                    state: false,
+                },
+            },
+        },
+    },
+
+    // ...
+
+};
+```
+
+## UpdatedAt
+
+The `updatedAt` column allows you to store the last time the database entry was updated at (String ISO 8601 format).
+
+```javascript
+{
+    "userId": "...",
+    "userData": {
+        "..."
+    },
+    "updatedAt": "2019-04-03T10:54:54.191Z"
+}
+```
+
+The option is disabled by default, but you can enable it inside your config file the following way:
+
+```javascript
+// @language=javascript
+
+// src/config.js
+
+module.exports = {
+    user: {
+        updatedAt: true
+    },
+
+    // ...
+
+};
+
+// @language=typescript
+
+// src/config.ts
+
+const config = {
+    user: {
+        updatedAt: true
+    },
+
+    // ...
+
 };
 ```
 
@@ -240,12 +501,15 @@ this.$user.getId();
 This is going to return an ID that looks like this:
 
 ```js
-// For Amazon Alexa
+// @platform=Alexa
 amzn1.ask.account.AGJCMQPNU2XQWLNJXU2K23R3RWVTWCA6OX7YK7W57E7HVZJSLH4F5U2JOLYELR4PSDSFGSDSD32YHMRG36CUUAY3G5QI5QFNDZ44V5RG6SBN3GUCNTRHAVT5DSDSD334e34I37N3MP2GDCHO7LL2JL2LVN6UFJ6Q2GEVVKL5HNHOWBBD7ZQDQYWNHYR2BPPWJPTBPBXPIPBVFXA
 
-// For Google Assistant
+// @platform=Google Assistant
 ARke43GoJIqbF8g1vfyDdqL_Sffh
 ```
+
+Note: Google Action user IDs are generated by Jovo and stored in the Google Action user storage. [Learn more about the process here](../../platforms/google-assistant#user-id '../google-assistant#user-id').
+
 
 ## Locale
 

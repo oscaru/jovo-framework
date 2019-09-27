@@ -1,24 +1,30 @@
+import crypto = require('crypto');
 import {
     BaseApp,
-    Output,
     EnumRequestType,
+    ErrorCode,
     HandleRequest,
     Inputs,
     Jovo,
+    JovoError,
+    Log,
+    Output,
     Plugin,
     PluginConfig,
-    User,
     SessionConstants,
-    Log
-} from "jovo-core";
-import _merge = require('lodash.merge');
+    SpeechBuilder,
+    User,
+} from 'jovo-core';
 import _get = require('lodash.get');
-import _set = require('lodash.set');
+import _merge = require('lodash.merge');
+
 export interface Config extends PluginConfig {
     columnName?: string;
     implicitSave?: boolean;
     metaData?: MetaDataConfig;
     context?: ContextConfig;
+    updatedAt?: boolean;
+    dataCaching?: boolean;
 }
 
 export interface MetaDataConfig {
@@ -61,8 +67,8 @@ export interface ContextPrevObject {
         inputs?: Inputs;
     };
     response?: {
-        speech?: string;
-        reprompt?: string | string[];
+        speech?: string | SpeechBuilder;
+        reprompt?: string | SpeechBuilder | string[];
         state?: string;
         output?: Output;
     };
@@ -72,40 +78,54 @@ export interface UserMetaData {
     lastUsedAt?: string;
     sessionsCount?: number;
     createdAt?: string;
-    requests?: any; // tslint:disable-line
+    requests?: {
+        [ key: string ]: {
+            count: number;
+            log: string[];
+        };
+    };
+    devices?: {
+        [ key: string ]: {
+            hasAudioInterface: boolean;
+            hasScreenInterface: boolean;
+            hasVideoInterface: boolean;
+        };
+    };
 }
 
 export class JovoUser implements Plugin {
 
     config: Config = {
         columnName: 'userData',
-        implicitSave: true,
-        metaData: {
-            enabled: false,
-            lastUsedAt: true,
-            sessionsCount: true,
-            createdAt: true,
-            requestHistorySize: 4,
-            devices: true,
-        },
         context: {
             enabled: false,
             prev: {
-                size: 1,
                 request: {
+                    inputs: true,
                     intent: true,
                     state: true,
-                    inputs: true,
                     timestamp: true,
                 },
                 response: {
-                    speech: true,
-                    reprompt: true,
-                    state: true,
                     output: true,
+                    reprompt: true,
+                    speech: true,
+                    state: true,
                 },
+                size: 1,
             },
         },
+        dataCaching: false,
+        implicitSave: true,
+        metaData: {
+            createdAt: true,
+            devices: true,
+            enabled: false,
+            lastUsedAt: true,
+            requestHistorySize: 4,
+            sessionsCount: true,
+        },
+        updatedAt: false,
     };
 
     constructor(config?: Config) {
@@ -113,20 +133,18 @@ export class JovoUser implements Plugin {
         if (config) {
             this.config = _merge(this.config, config);
         }
+        // tslint:disable
         this.loadDb = this.loadDb.bind(this);
         this.saveDb = this.saveDb.bind(this);
+        // tslint:enable
     }
 
     install(app: BaseApp): void {
 
         app.middleware('user.load')!.use(this.loadDb);
         app.middleware('user.save')!.use(this.saveDb);
-
         const loadDb = this.loadDb;
         const saveDb = this.saveDb;
-        User.prototype.$context = {};
-        User.prototype.$data = {};
-        User.prototype.$metaData = {};
 
         /**
          * Return the intent at the specified index
@@ -144,7 +162,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {String}
          */
-        User.prototype.getPrevRequestState = function(index: number) {
+        User.prototype.getPrevRequestState = function (index: number) {
             return _get(this.$context, `prev[${index}].request.state`);
         };
 
@@ -154,7 +172,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {String}
          */
-        User.prototype.getPrevResponseState = function(index: number) {
+        User.prototype.getPrevResponseState = function (index: number) {
             return _get(this.$context, `prev[${index}].response.state`);
         };
 
@@ -164,7 +182,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {*}
          */
-        User.prototype.getPrevInputs = function(index: number) {
+        User.prototype.getPrevInputs = function (index: number) {
             return _get(this.$context, `prev[${index}].request.inputs`);
         };
 
@@ -174,7 +192,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {String|*}
          */
-        User.prototype.getPrevTimestamp = function(index: number) {
+        User.prototype.getPrevTimestamp = function (index: number) {
             return _get(this.$context, `prev[${index}].request.timestamp`);
         };
 
@@ -184,7 +202,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {String}
          */
-        User.prototype.getPrevSpeech = function(index: number) {
+        User.prototype.getPrevSpeech = function (index: number) {
             return _get(this.$context, `prev[${index}].response.speech`);
         };
 
@@ -194,7 +212,7 @@ export class JovoUser implements Plugin {
          * @param {number} index
          * @return {String}
          */
-        User.prototype.getPrevReprompt = function(index: number) {
+        User.prototype.getPrevReprompt = function (index: number) {
             return _get(this.$context, `prev[${index}].response.reprompt`);
         };
 
@@ -203,7 +221,7 @@ export class JovoUser implements Plugin {
          * Explicit user deletion
          * @returns {Promise<void>}
          */
-        User.prototype.delete = async function() {
+        User.prototype.delete = async function () {
             const userId = this.getId();
 
             if (typeof userId === 'undefined') {
@@ -224,14 +242,14 @@ export class JovoUser implements Plugin {
          * Load user from db
          * @returns {Promise<any>}
          */
-        User.prototype.loadData = async function() {
+        User.prototype.loadData = async function () {
             if (!this.jovo) {
                 throw new Error('Jovo object is not initialized.');
             }
-            return await loadDb({
-                jovo: this.jovo,
+            return loadDb({
+                app: this.jovo.$app,
                 host: this.jovo.$host,
-                app: this.jovo.$app
+                jovo: this.jovo,
             }, true);
 
         };
@@ -240,18 +258,17 @@ export class JovoUser implements Plugin {
          * Save user to db
          * @returns {Promise<any>}
          */
-        User.prototype.saveData = async function() {
+        User.prototype.saveData = async function () {
             if (!this.jovo) {
                 throw new Error('Jovo object is not initialized.');
             }
-            return await saveDb({
-                jovo: this.jovo,
+            return saveDb({
+                app: this.jovo.$app,
                 host: this.jovo.$host,
-                app: this.jovo.$app
+                jovo: this.jovo,
             }, true);
 
         };
-
 
         /**
          * Repeats last speech & reprompt
@@ -262,12 +279,13 @@ export class JovoUser implements Plugin {
          *      context: true
          * }
          */
-        Jovo.prototype.repeat = async function() {
+        Jovo.prototype.repeat = async function () {
             if (_get(this.$user, '$context.prev[0].response.output')) {
                 this.setOutput(_get(this.$user, '$context.prev[0].response.output'));
             }
         };
     }
+
     loadDb = async (handleRequest: HandleRequest, force = false) => {
         // no database
         if (!handleRequest.app.$db) {
@@ -282,40 +300,59 @@ export class JovoUser implements Plugin {
             return Promise.resolve();
         }
         if (!handleRequest.jovo) {
-            throw new Error('Jovo object is not initialized.');
+            throw new JovoError(
+                'jovo object is not initialized.',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
 
         if (!handleRequest.jovo.$user) {
-            throw new Error('User object is not initialized');
+            throw new JovoError(
+                'user object is not initialized',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
         const userId = handleRequest.jovo.$user.getId();
 
         if (typeof userId === 'undefined') {
-            throw new Error(`Can't load user with undefined userId`);
+            throw new JovoError(
+                `Can't load user with undefined userId`,
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
-
 
         const data = await handleRequest.app.$db.load(userId);
 
-
         Log.verbose(Log.header('Jovo user (load)', 'framework'));
         Log.yellow().verbose(`this.$user.getId(): ${userId}`);
-        if (!data) {
-            Object.assign(handleRequest.jovo.$user, {
-                $context: {},
-                $data: {},
-                $metaData: {},
-                isDeleted: false,
-            });
+
+        if (!data || data === undefined) {
+            handleRequest.jovo.$user.isDeleted = false;
         } else {
             handleRequest.jovo.$user.new = false;
-            _set(handleRequest.jovo.$user, '$data',
-                _get(data, `${this.config.columnName}.data`, {}));
-            _set(handleRequest.jovo.$user, '$metaData',
-                _get(data, `${this.config.columnName}.metaData`, {}));
-            _set(handleRequest.jovo.$user, '$context',
-                _get(data, `${this.config.columnName}.context`, {}));
         }
+
+        handleRequest.jovo.$user.$data = _get(data, `${this.config.columnName}.data`, {});
+
+        if (this.config.metaData && this.config.metaData.enabled) {
+            handleRequest.jovo.$user.$metaData = _get(data, `${this.config.columnName}.metaData`, {});
+        }
+
+        if (this.config.context && this.config.context.enabled) {
+            handleRequest.jovo.$user.$context = _get(data, `${this.config.columnName}.context`, {});
+        }
+
+        // can't parse $user, so we parse object containing its data
+        const userData = {
+            context: handleRequest.jovo.$user.$context,
+            data: handleRequest.jovo.$user.$data,
+            metaData: handleRequest.jovo.$user.$metaData,
+        };
+
+        this.updateDbLastState(handleRequest, userData);
 
         Log.yellow().verbose(`this.$user.new = ${handleRequest.jovo.$user.new}`);
         Log.verbose();
@@ -337,19 +374,27 @@ export class JovoUser implements Plugin {
             return Promise.resolve();
         }
         if (!handleRequest.jovo) {
-            throw new Error('Jovo object is not initialized.');
+            throw new JovoError(
+                'jovo object is not initialized.',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
         if (!handleRequest.jovo.$user) {
-            throw new Error('User object is not initialized');
+            throw new JovoError(
+                'user object is not initialized',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
-        if(handleRequest.jovo.$user.isDeleted) {
+        if (handleRequest.jovo.$user.isDeleted) {
             return Promise.resolve();
         }
         if (this.config.implicitSave === false && force === false) {
             return Promise.resolve();
         }
-        const userData: {data?: any, context?: UserContext, metaData?: UserMetaData} =  { // tslint:disable-line
-            data: _get(handleRequest.jovo.$user, '$data')
+        const userData: { data?: any, context?: UserContext, metaData?: UserMetaData } = { // tslint:disable-line
+            data: _get(handleRequest.jovo.$user, '$data'),
         };
 
         if (this.config.context &&
@@ -367,13 +412,33 @@ export class JovoUser implements Plugin {
         const userId = handleRequest.jovo.$user.getId();
 
         if (typeof userId === 'undefined') {
-            throw new Error(`Can't save user with undefined userId`);
+            throw new JovoError(
+                `Can't save user with undefined userId`,
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
 
-        await handleRequest.app.$db.save(
-            userId,
-            this.config.columnName || 'userData',
-            userData);
+        const updatedAt = this.config.updatedAt ? (new Date()).toISOString() : undefined;
+
+        if (this.config.dataCaching) {
+            // only save to db if there were changes made.
+            if (!this.userDataIsEqualToLastState(handleRequest, userData)) {
+                await handleRequest.app.$db.save(
+                    userId,
+                    this.config.columnName || 'userData',
+                    userData,
+                    updatedAt,
+                );
+            }
+        } else {
+            await handleRequest.app.$db.save(
+                userId,
+                this.config.columnName || 'userData',
+                userData,
+                updatedAt,
+            );
+        }
 
         Log.verbose(Log.header('Jovo user: (save) ', 'framework'));
         Log.yellow().verbose(` Saved user: ${userId}`);
@@ -386,152 +451,286 @@ export class JovoUser implements Plugin {
 
     };
 
+    /**
+     * Caches the current state of the user data hashed inside the jovo object
+     * @param {HandleRequest} handleRequest https://www.jovo.tech/docs/plugins#handlerequest
+     * @param {object} data user data
+     */
+    private updateDbLastState(handleRequest: HandleRequest, data: object) {
+        const stringifiedData = JSON.stringify(data);
+        const hashedUserData = crypto.createHash('md5').update(stringifiedData).digest('hex');
+        handleRequest.jovo!.$user.db_cache_hash = hashedUserData;
+    }
+
+    /**
+     *
+     * @param {HandleRequest} handleRequest https://www.jovo.tech/docs/plugins#handlerequest
+     * @param {object} data current user data
+     */
+    private userDataIsEqualToLastState(handleRequest: HandleRequest, data: object): boolean {
+        const stringifiedData = JSON.stringify(data);
+        const hashedUserData = crypto.createHash('md5').update(stringifiedData).digest('hex'); // current user data
+        const cachedHashedUserData = handleRequest.jovo!.$user.db_cache_hash; // cached user data
+
+        return hashedUserData === cachedHashedUserData;
+    }
+
     private updateMetaData(handleRequest: HandleRequest) {
         if (!handleRequest.jovo) {
-            throw new Error('Jovo object is not initialized.');
+            throw new JovoError(
+                'jovo object is not initialized.',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
 
-        if (!handleRequest.jovo.$user) {
-            throw new Error('User object is not initialized');
-        }
-        if (_get(this.config, 'metaData.createdAt')) {
-            if (!_get(handleRequest.jovo.$user, '$metaData.createdAt')) {
-                _set(handleRequest.jovo.$user, '$metaData.createdAt', new Date().toISOString());
-            }
+        if (this.config.metaData!.createdAt) {
+            this.updateCreatedAt(handleRequest);
         }
 
-        if (_get(this.config, 'metaData.lastUsedAt')) {
-            _set(handleRequest.jovo.$user, '$metaData.lastUsedAt', new Date().toISOString());
+        if (this.config.metaData!.lastUsedAt) {
+            this.updateLastUsedAt(handleRequest);
         }
 
-        if (_get(this.config, 'metaData.sessionsCount')) {
-            let sessionsCount = _get(handleRequest.jovo.$user, '$metaData.sessionsCount') || 0;
-            if (handleRequest.jovo.isNewSession()) {
-                sessionsCount += 1;
-            }
-            _set(handleRequest.jovo.$user, '$metaData.sessionsCount', sessionsCount);
+        if (this.config.metaData!.sessionsCount) {
+            this.updateSessionsCount(handleRequest);
         }
 
-        if (_get(this.config, 'metaData.requestHistorySize') > 0) {
-            if (!handleRequest.jovo.$user.$metaData.requests) {
-                handleRequest.jovo.$user.$metaData.requests = {};
-            }
-
-            if (!handleRequest.jovo.$user.$metaData.requests[handleRequest.jovo.getHandlerPath()]) {
-                handleRequest.jovo.$user.$metaData.requests[handleRequest.jovo.getHandlerPath()] = {
-                    count: 0,
-                    log: [],
-                };
-            }
-
-            // const requestItem = _get(handleRequest.jovo.$user,`metaData.requests.${handleRequest.jovo.getHandlerPath()}`);
-            const requestItem = handleRequest.jovo.$user.$metaData.requests[handleRequest.jovo.getHandlerPath()];
-
-            requestItem.count += 1;
-            requestItem.log.push(new Date().toISOString());
-
-            if (requestItem.log.length > _get(this.config, 'metaData.requestHistorySize')) {
-                requestItem.log = requestItem.log.slice(1, requestItem.log.length);
-            }
+        if (this.config.metaData!.requestHistorySize! > 0) {
+            this.updateRequestHistory(handleRequest);
         }
 
-        if (_get(this.config, 'metaData.devices')) {
-            if (!_get(handleRequest.jovo.$user, '$metadata.devices["'+handleRequest.jovo.getDeviceId()+'"]')) {
-                const device = {
-                    hasAudioInterface: handleRequest.jovo.hasAudioInterface(),
-                    hasScreenInterface: handleRequest.jovo.hasScreenInterface(),
-                    hasVideoInterface: handleRequest.jovo.hasVideoInterface(),
-                };
-                _set(handleRequest.jovo.$user,
-                    '$metaData.devices["'+handleRequest.jovo.getDeviceId()+'"]',
-                    device);
-            }
+        if (this.config.metaData!.devices) {
+            this.updateDevices(handleRequest);
         }
     }
 
+    /**
+     * update $metaData.createdAt
+     * @param {HandleRequest} handleRequest
+     */
+    private updateCreatedAt(handleRequest: HandleRequest) {
+        // createdAt should only be set once for each user
+        if (!handleRequest.jovo!.$user.$metaData.createdAt) {
+            handleRequest.jovo!.$user.$metaData.createdAt = new Date().toISOString();
+        }
+    }
+
+    /**
+     * update $metaData.lastUsedAt
+     * @param {HandleRequest} handleRequest
+     */
+    private updateLastUsedAt(handleRequest: HandleRequest) {
+        handleRequest.jovo!.$user.$metaData.lastUsedAt = new Date().toISOString();
+    }
+
+    /**
+     * update $metaData.sessionsCount
+     * @param {HandleRequest} handleRequest
+     */
+    private updateSessionsCount(handleRequest: HandleRequest) {
+        let sessionsCount = handleRequest.jovo!.$user.$metaData.sessionsCount || 0;
+        if (handleRequest.jovo!.isNewSession()) {
+            sessionsCount += 1;
+        }
+        handleRequest.jovo!.$user.$metaData.sessionsCount = sessionsCount;
+    }
+
+    /**
+     * update $metaData.requests
+     * @param {HandleRequest} handleRequest
+     */
+    private updateRequestHistory(handleRequest: HandleRequest) {
+        if (!handleRequest.jovo!.$user.$metaData.requests) {
+            handleRequest.jovo!.$user.$metaData.requests = {};
+        }
+
+        if (!handleRequest.jovo!.$user.$metaData.requests[ handleRequest.jovo!.getHandlerPath() ]) {
+            handleRequest.jovo!.$user.$metaData.requests[ handleRequest.jovo!.getHandlerPath() ] = {
+                count: 0,
+                log: [],
+            };
+        }
+
+        const requestItem = handleRequest.jovo!.$user.$metaData.requests[ handleRequest.jovo!.getHandlerPath() ];
+
+        requestItem.count += 1;
+        requestItem.log.push(new Date().toISOString());
+
+        if (requestItem.log.length > this.config.metaData!.requestHistorySize!) {
+            requestItem.log = requestItem.log.slice(1, requestItem.log.length);
+        }
+    }
+
+    /**
+     * update $metaData.devices
+     * @param {HandleRequest} handleRequest
+     */
+    private updateDevices(handleRequest: HandleRequest) {
+        if (!handleRequest.jovo!.$user.$metaData.devices) {
+            handleRequest.jovo!.$user.$metaData.devices = {};
+        }
+        if (!handleRequest.jovo!.$user.$metaData.devices[ '' + handleRequest.jovo!.getDeviceId() + '' ]) {
+            const device = {
+                hasAudioInterface: handleRequest.jovo!.hasAudioInterface(),
+                hasScreenInterface: handleRequest.jovo!.hasScreenInterface(),
+                hasVideoInterface: handleRequest.jovo!.hasVideoInterface(),
+            };
+            handleRequest.jovo!.$user.$metaData.devices[ '' + handleRequest.jovo!.getDeviceId() + '' ] = device;
+        }
+    }
+
+    /**
+     * update $user.$context
+     * @param {HandleRequest} handleRequest
+     */
     private updateContextData(handleRequest: HandleRequest) {
         if (!handleRequest.jovo) {
-            throw new Error('Jovo object is not initialized.');
+            throw new JovoError(
+                'jovo object is not initialized.',
+                ErrorCode.ERR,
+                'jovo-framework',
+            );
         }
-        if (!handleRequest.jovo.$user) {
-            throw new Error('User object is not initialized');
-        }
-        if (_get(this.config, 'context.prev.size') < 1) {
+
+        if (this.config.context!.prev!.size! < 1) {
             return;
         }
-        if (!_get(handleRequest.jovo.$user, '$context.prev')) {
-            _set(handleRequest.jovo.$user, '$context.prev', []);
+        if (!handleRequest.jovo.$user.$context.prev) {
+            handleRequest.jovo.$user.$context.prev = [];
         }
 
-
-        if (_get(this.config, 'metaData.createdAt')) {
-            if (!_get(handleRequest.jovo.$user, '$metaData.createdAt')) {
-                _set(handleRequest.jovo.$user, '$metaData.createdAt', new Date().toISOString());
-            }
-        }
         const prevObject: ContextPrevObject = {};
 
-        if (_get(this.config, 'context.prev.response.speech')) {
-            if (handleRequest.jovo.$output.tell) {
-                _set(prevObject, 'response.speech', handleRequest.jovo.$output.tell.speech);
-            }
-
-            if (handleRequest.jovo.$output.ask) {
-                _set(prevObject, 'response.speech', handleRequest.jovo.$output.ask.speech);
-            }
+        // initialize response/request object if they will be needed (one of the config values is true)
+        // If we don't initialize the other update functions will try to set the values of an undefined object
+        // e.g. prevObject.response.speech --> will throw TypeError
+        if (Object.values(this.config.context!.prev!.response!).includes(true)) {
+            prevObject.response = {};
         }
-        if (_get(this.config, 'context.prev.response.reprompt')) {
-            if (handleRequest.jovo.$output.ask) {
-                _set(prevObject, 'response.reprompt', handleRequest.jovo.$output.ask.reprompt);
-            }
+        if (Object.values(this.config.context!.prev!.request!).includes(true)) {
+            prevObject.request = {};
         }
 
-        if (_get(this.config, 'context.prev.response.state')) {
-                // prevObject.response.state = handleRequest.jovo.getState();
-            if (handleRequest.jovo.$session &&
-                handleRequest.jovo.$session.$data &&
-                handleRequest.jovo.$session.$data[SessionConstants.STATE]) {
-                _set(prevObject, 'response.state', handleRequest.jovo.$session.$data[SessionConstants.STATE]);
-
-            }
+        if (this.config.context!.prev!.response!.speech) {
+            this.updatePrevSpeech(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.response!.reprompt) {
+            this.updatePrevReprompt(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.response!.state) {
+            this.updatePrevResponseState(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.request!.timestamp) {
+            this.updatePrevTimestamp(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.request!.state) {
+            this.updatePrevRequestState(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.request!.inputs) {
+            this.updatePrevInputs(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.request!.intent) {
+            this.updatePrevIntent(handleRequest, prevObject);
+        }
+        if (this.config.context!.prev!.response!.output) {
+            this.updatePrevOutput(handleRequest, prevObject);
         }
 
-        if (_get(this.config, 'context.prev.request.timestamp')) {
-            _set(prevObject, 'request.timestamp', handleRequest.jovo.$request!.getTimestamp());
-        }
-        if (_get(this.config, 'context.prev.request.state')) {
-            if (_get(handleRequest.jovo.$requestSessionAttributes, SessionConstants.STATE)) {
-                _set(prevObject, 'request.state', handleRequest.jovo.$requestSessionAttributes[SessionConstants.STATE]);
-            }
-        }
-
-        if (_get(this.config, 'context.prev.request.inputs')) {
-            if (handleRequest.jovo.$inputs) {
-                _set(prevObject, 'request.inputs', handleRequest.jovo.$inputs);
-            }
-        }
-
-        if (_get(this.config, 'context.prev.request.intent')) {
-            if (handleRequest.jovo.$type!.type === EnumRequestType.INTENT) {
-                _set(prevObject, 'request.intent', handleRequest.jovo.$plugins.Router.route.intent);
-            } else {
-                _set(prevObject, 'request.intent', handleRequest.jovo.$plugins.Router.route.path);
-            }
-        }
-        if (_get(this.config, 'context.prev.response.output')) {
-            if (handleRequest.jovo.$output) {
-                _set(prevObject, 'response.output', handleRequest.jovo.$output);
-            }
-        }
-        if (_get(prevObject, 'request') || _get(prevObject, 'response')) {
+        if (prevObject.request || prevObject.response) {
             if (handleRequest.jovo.$user.$context.prev) {
                 // Prevents storing empty object
                 handleRequest.jovo.$user.$context.prev.unshift(prevObject);
-                handleRequest.jovo.$user.$context.prev = handleRequest.jovo.$user.$context.prev.slice(0, _get(this.config, 'context.prev.size')); // add new prevObject to the beginning
+                handleRequest.jovo.$user.$context.prev = handleRequest.jovo.$user.$context.prev.slice(0, this.config.context!.prev!.size); // add new prevObject to the beginning
             }
         }
     }
-    uninstall(app: BaseApp) {
 
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevSpeech(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$output.tell) {
+            prevObject.response!.speech = handleRequest.jovo!.$output.tell.speech;
+        }
+
+        if (handleRequest.jovo!.$output.ask) {
+            prevObject.response!.speech = handleRequest.jovo!.$output.ask.speech;
+        }
     }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevReprompt(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$output.ask) {
+            prevObject.response!.reprompt = handleRequest.jovo!.$output.ask.reprompt;
+        }
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevResponseState(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$session &&
+            handleRequest.jovo!.$session.$data &&
+            handleRequest.jovo!.$session.$data[ SessionConstants.STATE ]) {
+
+            prevObject.response!.state = handleRequest.jovo!.$session.$data[ SessionConstants.STATE ];
+
+        }
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevTimestamp(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        prevObject.request!.timestamp = handleRequest.jovo!.$request!.getTimestamp();
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevRequestState(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$requestSessionAttributes[ SessionConstants.STATE ]) {
+            prevObject.request!.state = handleRequest.jovo!.$requestSessionAttributes[ SessionConstants.STATE ];
+        }
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevInputs(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$inputs) {
+            prevObject.request!.inputs = handleRequest.jovo!.$inputs;
+        }
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevIntent(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        prevObject.request!.intent = handleRequest.jovo!.$plugins.Router.route.path;
+        if (handleRequest.jovo!.$type!.type === EnumRequestType.INTENT) {
+            prevObject.request!.intent = handleRequest.jovo!.$plugins.Router.route.intent;
+        }
+    }
+
+    /**
+     * @param {HandleRequest} handleRequest
+     * @param {ContextPrevObject} prevObject
+     */
+    private updatePrevOutput(handleRequest: HandleRequest, prevObject: ContextPrevObject) {
+        if (handleRequest.jovo!.$output) {
+            prevObject.response!.output = handleRequest.jovo!.$output;
+        }
+    }
+
 }

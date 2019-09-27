@@ -1,7 +1,11 @@
-import {App} from "./App";
+import { BaseApp, Data, Handler, Jovo, Log, LogLevel, Project, Util } from 'jovo-core';
+import { App } from './App';
 
-import {UserMetaData, UserContext, ContextPrevObject} from "./middleware/user/JovoUser";
-import {Jovo, Data, Handler, Util, Log, LogLevel} from 'jovo-core';
+import { Component, ComponentDelegationOptions, ComponentResponse } from './middleware/Component';
+import { ComponentPlugin } from './middleware/ComponentPlugin';
+import { Route } from './middleware/Router';
+import { ContextPrevObject, UserContext, UserMetaData } from './middleware/user/JovoUser';
+
 export { App } from './App';
 export { server as Webhook } from './server';
 export { verifiedServer as WebhookVerified } from './server';
@@ -12,25 +16,47 @@ export { AzureFunction } from './hosts/AzureFunction';
 export { GoogleCloudFunction } from './hosts/GoogleCloudFunction';
 
 export { BasicLogging } from './middleware/logging/BasicLogging';
-export { Router } from './middleware/Router';
+export { Router, Route } from './middleware/Router';
 export { JovoUser, UserMetaData, ContextPrevObject } from './middleware/user/JovoUser';
-export { Util, LogLevel, Log };
+export { Util, LogLevel, Log, Project };
+
+export { 
+    Component,
+    ComponentConfig,
+    ComponentConstructorOptions,
+    ComponentData,
+    ComponentDelegationOptions,
+    ComponentResponse,
+    ComponentResponseStatus,
+    ComponentSessionData
+} from './middleware/Component';
+
+export { ComponentPlugin } from './middleware/ComponentPlugin'
 
 
 declare module 'express' {
+
     interface Application {
         jovoApp?: App;
+        ssl?: {key: Buffer, cert: Buffer}
     }
 }
 
 
 declare module 'jovo-core/dist/src/BaseApp' {
-
-    /**
-     * Sets handler object
-     * @param {Object} handlers
-     */
     export interface BaseApp {
+        /**
+         * 1st layer components.
+         * These were initialized by the developer using `app.useComponents`
+         */
+        $baseComponents: {
+            [key: string]: ComponentPlugin;
+        };
+        
+        /**
+         * Sets handler object
+         * @param {Object} handlers
+         */
         setHandler(...handler: Handler[]): this;
     }
 }
@@ -84,24 +110,50 @@ declare module 'jovo-core/dist/src/Jovo' {
          */
         followUpState(state: string): this;
 
-
-        /**
-         * Returns path to function inside the handler
-         * Examples
-         * LAUNCH = Launch function
-         * State1:IntentA => IntentA in state 'State1'
-         * @public
-         * @return {*}
-         */
-        getHandlerPath(): string;
-
-
         /**
          * Skips intent handling when called in NEW_USER, NEW_SESSION, ON_REQUEST
          * @public
          * @return {*}
          */
         skipIntentHandling(): Promise<void>;
+
+        /**
+         * Returns mapped intent name.
+         * @public
+         * @return {*}
+         */
+        getMappedIntentName(): string;
+
+
+        /**
+         * Returns route object.
+         * @public
+         * @return {*}
+         */
+        getRoute(): Route;
+
+        /**
+         * Delegates the requests & responses to the component defined with "componentName"
+         * @param {string} componentName
+         * @param {ComponentDelegationOptions} options
+         * @returns {Promise<void>}
+         */
+        delegate(componentName: string, options: ComponentDelegationOptions): Promise<void>;
+    }
+}
+
+declare module 'jovo-core/dist/src/Jovo' {
+    export interface Jovo {
+        $components: {
+            [ key: string ]: Component;
+        };
+
+        $activeComponents: {
+            [ key: string ]: ComponentPlugin
+        };
+
+        sendComponentResponse(response: ComponentResponse): Promise<void>;
+        // getActiveComponent(): Component; TODO
     }
 }
 
@@ -127,6 +179,7 @@ declare module 'jovo-core/dist/src/User' {
         $data: Data;
         $context: UserContext;
         isDeleted: boolean;
+        db_cache_hash?: string;
 
         /**
          * Return the intent at the specified index

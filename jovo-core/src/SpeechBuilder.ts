@@ -1,13 +1,82 @@
-'use strict';
-import {Jovo} from "./Jovo";
-const _sample = require('lodash.sample');
+import _merge = require('lodash.merge');
+import _sample = require('lodash.sample');
+import { Jovo } from './Jovo';
+
+export interface SsmlElements {
+    [ tag: string ]: SsmlElementAttributes;
+}
+
+export interface SsmlElementAttributes {
+    [ attribute: string ]: string | number | boolean;
+}
 
 /** Class SpeechBuilder */
 export class SpeechBuilder {
+    static ESCAPE_AMPERSAND = true;
+
+    /**
+     * Adds <speak> tags to a string. Replaces & with and (v1 compatibility)
+     * @param {string} text
+     * @returns {string}
+     */
+    static toSSML(text: string): string {
+        text = text.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
+        text = '<speak>' + text + '</speak>';
+
+        if (SpeechBuilder.ESCAPE_AMPERSAND) { // workaround (v1 compatibility)
+            text = text.replace(/&/g, 'and');
+        }
+
+        return text;
+    }
+
+    /**
+     * Removes everything that is surrounded by <>
+     * @param {string} ssml
+     * @returns {string}
+     */
+    static removeSSML(ssml: string): string {
+        let noSSMLText = ssml.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
+        noSSMLText = noSSMLText.replace(/<[^>]*>/g, '');
+        return noSSMLText;
+    }
+
+    /**
+     * Removes <speak> tags from string
+     * @param {string} ssml
+     * @returns {string}
+     */
+    static removeSpeakTags(ssml: string): string {
+        return ssml.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
+    }
+
+    /**
+     * Escapes XML in SSML
+     *
+     * @see https://stackoverflow.com/questions/7918868/how-to-escape-xml-entities-in-javascript
+     */
+    static escapeXml(unsafe: string) {
+        return unsafe.replace(/[<>&'"]/g, (c) => {
+            switch (c) {
+                case '<':
+                    return '&lt;';
+                case '>':
+                    return '&gt;';
+                case '&':
+                    return '&amp;';
+                case '\'':
+                    return '&apos;';
+                default:
+                case '"':
+                    return '&quot;';
+            }
+        });
+    }
+
+    prosody = {};
     speech = '';
     jovo: Jovo | undefined;
 
-    static ESCAPE_AMPERSAND = true;
     /**
      * Constructor
      * @param {Jovo=} jovo instance
@@ -24,11 +93,10 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addSentence(text: string | string[], condition?: boolean, probability?: number): this {
-        if (Array.isArray(text)) {
-            return this.addText('<s>' + _sample(text) + '</s>', condition, probability);
-        }
-        return this.addText('<s>' + text + '</s>', condition, probability);
+    addSentence(text: string | string[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        return this.addText(Array.isArray(text) ? _sample(text)! : text, condition, probability, _merge({
+            s: {},
+        }, surroundSsml));
     }
 
     /**
@@ -38,11 +106,12 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addSayAsCardinal(n: number | number[], condition?: boolean, probability?: number): this {
-        if (Array.isArray(n)) {
-            return this.addText('<say-as interpret-as="cardinal">'+ _sample(n) +'</say-as>', condition, probability);
-        }
-        return this.addText('<say-as interpret-as="cardinal">'+n+'</say-as>', condition, probability);
+    addSayAsCardinal(n: number | number[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        return this.addText(String(Array.isArray(n) ? _sample(n) : n), condition, probability, _merge({
+            'say-as': {
+                'interpret-as': 'cardinal',
+            },
+        }, surroundSsml));
     }
 
     /**
@@ -52,7 +121,7 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addCardinal(n: number | number[], condition?: boolean, probability?: number): this {
+    addCardinal(n: number | number[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
         return this.addSayAsCardinal(n, condition, probability);
     }
 
@@ -63,11 +132,12 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addSayAsOrdinal(n: number | number[], condition?: boolean, probability?: number): this {
-        if (Array.isArray(n)) {
-            return this.addText('<say-as interpret-as="ordinal">'+ _sample(n) +'</say-as>', condition, probability);
-        }
-        return this.addText('<say-as interpret-as="ordinal">'+n+'</say-as>', condition, probability);
+    addSayAsOrdinal(n: number | number[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        return this.addText(String(Array.isArray(n) ? _sample(n) : n), condition, probability, _merge({
+            'say-as': {
+                'interpret-as': 'ordinal',
+            },
+        }, surroundSsml));
     }
 
     /**
@@ -77,7 +147,7 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addOrdinal(n: number | number[], condition?: boolean, probability?: number): this {
+    addOrdinal(n: number | number[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
         return this.addSayAsOrdinal(n, condition, probability);
     }
 
@@ -88,11 +158,12 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addSayAsCharacters(characters: string | string[], condition?: boolean, probability?: number): this {
-        if (Array.isArray(characters)) {
-            return this.addText('<say-as interpret-as="characters">'+_sample(characters)+'</say-as>', condition, probability);
-        }
-        return this.addText('<say-as interpret-as="characters">'+characters+'</say-as>', condition, probability);
+    addSayAsCharacters(characters: string | string[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        return this.addText(Array.isArray(characters) ? _sample(characters)! : characters, condition, probability, _merge({
+            'say-as': {
+                'interpret-as': 'characters',
+            },
+        }, surroundSsml));
     }
 
     /**
@@ -102,7 +173,7 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addCharacters(characters: string | string[], condition?: boolean, probability?: number): this {
+    addCharacters(characters: string | string[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
         return this.addSayAsCharacters(characters, condition, probability);
     }
 
@@ -114,28 +185,31 @@ export class SpeechBuilder {
      * @param {number} probability
      * @return {SpeechBuilder}
      */
-    addBreak(time: string | string[], condition?: boolean, probability?: number): this {
-        const strengthValues = ['none', 'x-weak', 'weak', 'medium', 'strong', 'x-strong'];
-        const breakTime = Array.isArray(time) ? _sample(time) : time;
-        if (strengthValues.indexOf(breakTime) > -1) {
-            return this.addText('<break strength="' + breakTime + '"/>', condition, probability);
-        } else {
-            return this.addText('<break time="' + breakTime + '"/>', condition, probability);
-        }
+    addBreak(time: string | string[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        const strengthValues = [ 'none', 'x-weak', 'weak', 'medium', 'strong', 'x-strong' ];
+        const breakTime = Array.isArray(time) ? _sample(time)! : time;
+        const attributeName = strengthValues.indexOf(breakTime) > -1 ? 'strength' : 'time';
+        return this.addText('', condition, probability, _merge({
+            break: {
+                [ attributeName ]: breakTime,
+            },
+        }, surroundSsml));
     }
+
     /**
      * Adds text to speech
      * @public
      * @param {string} text
      * @param {boolean} condition
      * @param {number} probability
+     * @param {SsmlElement}  ssml element description
      * @return {SpeechBuilder}
      */
-    addText(text: string | string[], condition?: boolean, probability?: number): this {
-        if (typeof condition === "boolean" && condition === false) {
+    addText(text: string | string[], condition?: boolean, probability?: number, surroundSsml?: SsmlElements): this {
+        if (typeof condition === 'boolean' && condition === false) {
             return this;
         }
-        if (typeof probability === "number") {
+        if (typeof probability === 'number') {
             if (Math.random() >= probability) {
                 return this;
             }
@@ -144,8 +218,50 @@ export class SpeechBuilder {
             this.speech += ' ';
         }
 
-        this.speech += Array.isArray(text) ? _sample(text) : text;
+        let finalText = Array.isArray(text) ? _sample(text)! : text;
+
+        if (typeof surroundSsml === 'object') {
+            Object.entries(surroundSsml).forEach(([ tagName, attributes ]) => {
+                finalText = this.wrapInSsmlElement(finalText, tagName, attributes);
+            });
+        }
+
+        this.speech += finalText;
+
         return this;
+    }
+
+    /**
+     * Sets prosody for this speech builder, to be applied on all speech.
+     * @public
+     * @param {SsmlElementAttributes} prosody
+     * @return {SpeechBuilder}
+     */
+    setProsody(prosody: SsmlElementAttributes) {
+        this.prosody = prosody;
+        return this;
+    }
+
+    /**
+     * Builds attribute string from attribute key-values
+     * @private
+     * @param {SsmlElementAttributes} attributes
+     * @return {string}
+     */
+    buildAttributeString(attributes: SsmlElementAttributes) {
+        return Object.entries(attributes).map(([ attrName, attrVal ]) => ` ${attrName}="${attrVal}"`).join('');
+    }
+
+    /**
+     * Builds an enclosing tag around text
+     * @private
+     * @param {string} text
+     * @param {string} tagName
+     * @param {SsmlElementAttributes} attributes
+     * @return {string}
+     */
+    wrapInSsmlElement(text: string, tagName: string, attributes: SsmlElementAttributes) {
+        return text ? `<${tagName}${this.buildAttributeString(attributes)}>${text}</${tagName}>` : `<${tagName}${this.buildAttributeString(attributes)}/>`;
     }
 
     /**
@@ -157,7 +273,14 @@ export class SpeechBuilder {
      * @return {SpeechBuilder}
      */
     addPhoneme(text: string, ph: string, alphabet = 'ipa'): this {
-        return this.addText(`<phoneme alphabet="${alphabet}" ph="${SpeechBuilder.escapeXml(ph)}">${text}</phoneme>`);
+        return this.addText(
+            text, undefined, undefined, {
+                phoneme: {
+                    alphabet,
+                    ph: SpeechBuilder.escapeXml(ph),
+                },
+            },
+        );
     }
 
     /**
@@ -197,45 +320,9 @@ export class SpeechBuilder {
      * @return {string}
      */
     toString(): string {
-        return this.speech;
-    }
-
-    static toSSML(text: string): string {
-        text = text.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
-        text = '<speak>' + text + '</speak>';
-
-        if (SpeechBuilder.ESCAPE_AMPERSAND) { // workaround (v1 compatibility)
-            text = text.replace(/&/g, 'and');
+        if (Object.keys(this.prosody).length) {
+            this.speech = this.wrapInSsmlElement(this.speech, 'prosody', this.prosody);
         }
-
-        return text;
-    }
-
-    static removeSSML(ssml: string): string {
-        let noSSMLText = ssml.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
-        noSSMLText = noSSMLText.replace(/<[^>]*>/g, '');
-        return noSSMLText;
-    }
-
-    static removeSpeakTags(ssml: string): string {
-        return ssml.replace(/<speak>/g, '').replace(/<\/speak>/g, '');
-    }
-
-    /**
-     * Escapes XML in SSML
-     *
-     * @see https://stackoverflow.com/questions/7918868/how-to-escape-xml-entities-in-javascript
-     */
-     static escapeXml(unsafe: string) {
-        return unsafe.replace(/[<>&'"]/g, (c) => {
-            switch (c) {
-                case '<': return '&lt;';
-                case '>': return '&gt;';
-                case '&': return '&amp;';
-                case '\'': return '&apos;';
-                default:
-                case '"': return '&quot;';
-            }
-        });
+        return this.speech;
     }
 }

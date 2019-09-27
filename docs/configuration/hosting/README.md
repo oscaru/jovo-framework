@@ -2,10 +2,11 @@
 
 In this section, you can learn more about different types of services that can be used for hosting your Alexa Skills and Google Actions.
 
-* [Introduction](#introduction)
-* [Deployment](#deployment)
-* [Available Integrations](#available-integrations)
-* [Code Example](#code-example)
+- [Hosting](#Hosting)
+  - [Introduction](#Introduction)
+  - [Deployment](#Deployment)
+  - [Available Integrations](#Available-Integrations)
+  - [Code Example](#Code-Example)
 
 
 ## Introduction
@@ -35,19 +36,23 @@ You can then use this file and upload it to the hosting provider of your choice.
 
 Find more information on server integrations here:
 
-Name | Description
------------- | -------------
-[ExpressJS Webhook](./express-js.md './hosting/express-js') | Run an express server as HTTPS endpoint
-[AWS Lambda](./aws-lambda.md './hosting/aws-lambda') | Run the voice app as AWS Lambda Function
-[Google Cloud Functions](./google-cloud-functions.md './hosting/google-cloud-functions') | Run the voice app on Google Cloud Functions
-[Azure Functions](./azure-functions.md './hosting/azure-functions') | Run the voice app on Azure Functions
-
+| Name                                                                                     | Description                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [ExpressJS Webhook](./express-js.md './hosting/express-js')                              | Run an express server as HTTPS endpoint     |
+| [AWS Lambda](./aws-lambda.md './hosting/aws-lambda')                                     | Run the voice app as AWS Lambda Function    |
+| [Google Cloud Functions](./google-cloud-functions.md './hosting/google-cloud-functions') | Run the voice app on Google Cloud Functions |
+| [Azure Functions](./azure-functions.md './hosting/azure-functions')                      | Run the voice app on Azure Functions        |
+| [Using nodejs built-in http server](./http-host.md './hosting/http-host')                | Run your app (almost) anywhere              |
 
 ## Code Example
 
 Here is what the `index.js` file looks like:
 
 ```javascript
+// @language=javascript
+
+// src/index.js
+
 'use strict';
 
 const { Webhook, ExpressJS, Lambda } = require('jovo-framework');
@@ -72,6 +77,36 @@ if (process.argv.indexOf('--webhook') > -1) {
 
 // AWS Lambda
 exports.handler = async (event, context, callback) => {
+    await app.handle(new Lambda(event, context, callback));
+};
+
+// @language=typescript
+
+// src/index.ts
+
+import { Webhook, ExpressJS, Lambda } from 'jovo-framework';
+import { app } = from './app';
+
+// ------------------------------------------------------------------
+// HOST CONFIGURATION
+// ------------------------------------------------------------------
+
+// ExpressJS (Jovo Webhook)
+if (process.argv.indexOf('--webhook') > -1) {
+    const port = process.env.JOVO_PORT || 3000;
+    Webhook.jovoApp = app;
+
+    Webhook.listen(port, () => {
+        console.info(`Local server listening on port ${port}.`);
+    });
+
+    Webhook.post('/webhook', async (req: Express.Request, res: Express.Response) => {
+        await app.handle(new ExpressJS(req, res));
+    });
+}
+
+// AWS Lambda
+exports.handler = async (event: any, context: any, callback: Function) => {
     await app.handle(new Lambda(event, context, callback));
 };
 ```
