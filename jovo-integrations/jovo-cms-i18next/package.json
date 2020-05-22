@@ -1,35 +1,37 @@
 {
   "name": "jovo-cms-i18next",
-  "version": "2.2.14",
+  "version": "3.0.15",
   "description": "",
   "main": "dist/src/index",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "tslint": "tslint -p tsconfig.json -c tslint.json",
-    "tsc": "tsc",
-    "rimraf": "rimraf ./dist",
-    "typedoc": "typedoc --out ./docs ./ --mode file",
-    "test": "jest"
+    "prettier": "prettier --config ./.prettierrc.js --write \"{test,src}/**/*\" --list-different",
+    "tslint": "node_modules/.bin/tslint -p tsconfig.json -c tslint.json",
+    "tsc": "node_modules/.bin/tsc",
+    "rimraf": "node_modules/.bin/rimraf ./dist",
+    "typedoc": "node_modules/.bin/typedoc --out ./docs ./ --mode file",
+    "test": "node_modules/.bin/jest"
   },
   "author": "jovotech",
   "license": "Apache-2.0",
   "dependencies": {
-    "i18next": "^15.0.8",
-    "jovo-core": "^2.2.13",
-    "lodash.merge": "^4.6.1"
+    "i18next": "^19.0.2",
+    "jovo-core": "^3.0.15",
+    "lodash.merge": "^4.6.2"
   },
   "devDependencies": {
     "@types/i18next": "^12.1.0",
     "@types/jest": "^24.0.11",
     "@types/node": "^10.3.1",
-    "jest": "^24.9.0",
+    "jest": "^25.1.0",
+    "prettier": "2.0.2",
     "rimraf": "^2.6.2",
     "source-map-support": "^0.5.8",
-    "ts-jest": "^24.0.1",
+    "ts-jest": "^25.4.0",
     "tslint": "^5.17.0",
     "tslint-config-prettier": "^1.18.0",
-    "typedoc": "^0.15.0",
-    "typescript": "^3.4.1"
+    "typedoc": "^0.15.6",
+    "typescript": "^3.8.3"
   },
   "jest": {
     "transform": {
@@ -47,5 +49,5 @@
   "files": [
     "dist/src/**/*"
   ],
-  "gitHead": "02550b3546066635c8a821c8eb3266c3fef8940c"
+  "gitHead": "85f493970553e479edcee02ad7037f617dd74fcd"
 }

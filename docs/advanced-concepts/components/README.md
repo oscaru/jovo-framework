@@ -38,19 +38,27 @@ The `models` folder contains the language model, the `src` folder contains the l
 
 ### handler
 
-The component's handler contains the states/intents to fulfill the incoming request. The only difference between the Jovo project's handler and component's handler is, that all of its intents are inside a state named after the component itself with the `START` intent being its entry point.
+The component's handler contains the states/intents to fulfill the incoming request. It has to have a `START` intent which is the entry point for the component.
 
 ```js
 // @language=typescript
 // handler.ts
 
 const handler: Handler = {
-    ConductSurvey: {
-        START() {
+    START() {
 
-        },
-        // other intents
-    }
+    },
+    // other intents
+}
+
+// @language=javascript
+// handler.js
+
+const handler = {
+    START() {
+
+    },
+    // other intents
 }
 ```
 
@@ -73,13 +81,31 @@ interface SurveyConfig extends ComponentConfig {
 const config: SurveyConfig = {
     intentMap: {
         'AMAZON.HelpIntent': 'HelpIntent',
+        'AMAZON.NoIntent': 'NoIntent',
         'AMAZON.StopIntent': 'END',
-        'StopIntent': 'END'
+        'StopIntent': 'END',
+        'AMAZON.YesIntent': 'YesIntent'
     },
     numberOfQuestions: 3
 };
 
 export {SurveyConfig, config as Config};
+
+// @language=javascript
+// config.js
+
+const config = {
+    intentMap: {
+        'AMAZON.HelpIntent': 'HelpIntent',
+        'AMAZON.NoIntent': 'NoIntent',
+        'AMAZON.StopIntent': 'END',
+        'StopIntent': 'END',
+        'AMAZON.YesIntent': 'YesIntent'
+    },
+    numberOfFails: 3
+};
+
+module.exports = config;
 ```
 
 ### i18n
@@ -110,31 +136,56 @@ For now, i18n is the only supported CMS, with other external ones planned.
 
 ### index
 
-The `index.ts` file at the root is the entry point of each component. It exports a class which contains references to the handler and config object as well as the path to the i18n folder.
+The `index.ts` file at the root is the entry point of each component. It exports a class which contains references to the handler and config object as well as the path to the i18n folder. The component's handler has to be nested inside a state named after the component itself to prevent intents from being overwritten. It also has a `name` property which has to be the same as the package name.
 
 ```js
 // @language=typescript
 // index.ts
 
-import { Handler } from 'jovo-core';
-import { ComponentPlugin } from 'jovo-framework';
+import { ComponentPlugin, Handler } from 'jovo-framework';
 
 import { Config, SurveyConfig } from './src/config';
 import { surveyHandler } from './src/handler';
 
 export class ConductSurvey extends ComponentPlugin {
-    handler: Handler = surveyHandler;
     config: SurveyConfig = Config;
     pathToI18n = './src/i18n/';
+    name = 'jovo-component-conduct-survey';
+    handler: Handler = {
+        [this.name]: surveyHandler
+    };
 
     constructor(config?: SurveyConfig) {
         super(config);
     }
 }
+
+// @language=javascript
+// index.js
+
+const {ComponentPlugin} = require('jovo-framework');
+
+const componentConfig = require('./src/config');
+const componentHandler = require('./src/handler');
+
+class GetPhoneNumber extends ComponentPlugin {
+    constructor(config) {
+        super(config);
+        this.config = componentConfig;
+        this.name = 'jovo-component-get-phone-number';
+        this.pathToI18n = './src/i18n/';
+        this.handler = {
+            [this.name]: componentHandler
+        };
+    }
+}
+
+module.exports = GetPhoneNumber; 
 ```
 
 Name | Description | Value | Required 
 --- | --- | --- | ---
+`name` | Name of your component. Has to be the same as the package name | `string` | Yes
 `handler` | Contains the logic of your component, i.e. states & intents | `object` | Yes
 `config` | Contains the default configuration | `object` | Yes
 `pathToI18n` | Specifies the path to your i18n folder containing the responses used in your component | `string` | Yes
@@ -144,11 +195,11 @@ That's the basic structure of a component.
 
 ## Using Conversational Components
 
-Learn how to integrate existing Conversational Components into your Jovo project [here](./using-components.md './using-components').
+Learn how to integrate existing Conversational Components into your Jovo project [here](./using-components.md './components/using-components').
 
 ## Developing Conversational Components
 
-Learn how to develop your own Conversational Components [here](./developing-components.md './developing-components').
+Learn how to develop your own Conversational Components [here](./developing-components.md './components/developing-components').
 
 <!--[metadata]: {
   "description": "Learn about the basic structure of Conversational Components.",

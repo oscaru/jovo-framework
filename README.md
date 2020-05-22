@@ -166,10 +166,9 @@ See the [Jovo Analytics Layer](./docs/integrations/analytics) for more informati
 Name | Description | Docs
 :--- | :--- | :---
 Dashbot | Chatbot and Voice App Analytics including Usage Metrics, Behavior Flows, and Live Interaction Transcripts | [📝](./docs/integrations/analytics/dashbot.md)
-Bespoken Analytics | Voice App Analytics including Usage Metrics, Logging, and Monitoring | [📝](./docs/integrations/analytics/bespoken.md)
 Chatbase | Voice App Analytics including Usage Metrics, Session Flows and Link Tracking | [📝](./docs/integrations/analytics/chatbase.md)
 Botanalytics | AI powered Chatbot Analytics and Voice Analytics | [📝](./docs/integrations/analytics/botanalytics.md)
-VoiceHero | Voice App Analytics including actionable insights, session tracking, custom events, cohorts, usage data and behavior flows to immediately improve in-app experience | [📝](./docs/integrations/analytics/voicehero.md)
+
 
 #### CMS Integrations
 
@@ -184,7 +183,6 @@ See the [Jovo CLI Docs](./docs/workflows/cli) for more information on CLI featur
 
 Name | Description | Docs
 :--- | :--- | :---
-bst proxy &nbsp; &nbsp; &nbsp; &nbsp; | Proxy service that creates a webhook link for local prototyping, with additional logging and analytics features | [📝](./docs/workflows/cli/run.md#bst-proxy)
 nodemon | Monitor changes and automatically restart the server | [📝](./docs/workflows/cli/run.md#nodemon)
 
 
@@ -192,7 +190,7 @@ nodemon | Monitor changes and automatically restart the server | [📝](./docs/w
 
 Find a quickstart guide and comprehensive tutorials here:
 * General:
-    * [Build a cross-platform voice app in 5 simple steps](https://www.jovo.tech/get-started)
+    * [Build a cross-platform voice app in 5 simple steps](https://www.jovo.tech#getting-started)
     * [Build an Alexa Skill with Jovo](https://www.jovo.tech/blog/alexa-skill-tutorial-nodejs/)
     * [Build a Google Action with Jovo](https://www.jovo.tech/blog/google-action-tutorial-nodejs/)
 * Account Linking:

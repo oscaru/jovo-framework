@@ -1,5 +1,6 @@
-import * as http from 'http';
+import { IncomingMessage, ServerResponse } from 'http';
 import { Host } from 'jovo-core';
+import * as url from 'url';
 
 /**
  * Jovo Host implemented using the nodejs http package https://nodejs.org/api/http.html.
@@ -8,20 +9,26 @@ import { Host } from 'jovo-core';
 export default class HttpHost implements Host {
   hasWriteFileAccess = true;
   $request: any; // tslint:disable-line
-  req: http.IncomingMessage;
-  res: http.ServerResponse;
-  headers: any; // tslint:disable-line
+  req: IncomingMessage;
+  res: ServerResponse;
+  headers: Record<string, any>; // tslint:disable-line
 
-  constructor(req: http.IncomingMessage, body: string, res: http.ServerResponse) {
+  constructor(req: IncomingMessage, body: string, res: ServerResponse) {
     this.req = req;
     this.res = res;
     this.headers = req.headers;
 
     try {
       this.$request = JSON.parse(body);
-    } catch (e) { // failed to parse the request body. Send an error back.
+    } catch (e) {
+      // failed to parse the request body. Send an error back.
       this.fail(e);
     }
+  }
+
+  getQueryParams(): Record<string, string> {
+    const queryData = url.parse(this.req.url!, true).query;
+    return (queryData as Record<string, string>) || {};
   }
 
   getRequestObject() {
@@ -40,10 +47,12 @@ export default class HttpHost implements Host {
   fail(error: Error) {
     if (this.res.headersSent === false) {
       this.res.setHeader('Content-Type', 'application/json; charset=utf8');
-      this.res.end(JSON.stringify({
-        code: 500,
-        msg: error.message,
-      }));
+      this.res.end(
+        JSON.stringify({
+          code: 500,
+          msg: error.message,
+        }),
+      );
     }
   }
 }

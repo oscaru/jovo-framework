@@ -46,6 +46,13 @@ After that have the enable the component using the the `useComponent(...componen
 const { GetPhoneNumber } = require("./components/jovo-component-get-phone-number");
 
 app.useComponents(new GetPhoneNumber());
+
+// @language=typescript
+// src/app.ts
+
+import { GetPhoneNumber } from "./components/jovo-component-get-phone-number";
+
+app.useComponents(new GetPhoneNumber());
 ```
 
 ## Configuration
@@ -59,11 +66,25 @@ Every component can be configured using your project's root config file:
 module.exports = {
     // ...
     components: { // contains configuration of every component
-        GetPhoneNumber: { // configuration of `GetPhoneNumber` component
+        'jovo-component-get-phone-number': {
             numberOfFails: 5
         }
     }
 };
+
+// @language=typescript
+// config.ts
+
+const config = {
+    // ...
+    components: {
+        'jovo-component-get-phone-number': {
+            numberOfFails: 2
+        }
+    }
+};
+
+export = config;
 ```
 
 The interface is the same as the component's default configuration, which should be documented in the component's README file.
@@ -99,18 +120,36 @@ Name | Description | Value | Required
 `options` | The options for the delegation | `object` | Yes
 `options.onCompletedIntent` | The name of the intent to which the component should route to as soon as it finished the task | `string` | Yes
 `options.data` | The data object will be filled by the component with the data it is supposed to collect. For example, the `ScheduleMeeting` component would need the users email to finish its task.. It offers the possibility to provide data you've already collected, so the component doesn't have to ask for it again. See more [here](#parsing-existing-data) | `object` | No
+`options.stateBeforeDelegate` | The state to which the framework will route back to after the component is finished | `string` | No
 
 ```js
 // @language=javascript
 // src/app.js
-const delegationOptions = {
-    onCompletedIntent: 'HelloWorldIntent',
-    data: {
-        email: 'xyz@jovo.tech'
-    }
-};
 
-this.delegate('ScheduleMeeting', delegationOptions);
+HelloWorldIntent() {
+    const delegationOptions = {
+        onCompletedIntent: 'HelloWorldIntent',
+        data: {
+            email: 'xyz@jovo.tech'
+        }
+    };
+
+    this.delegate('jovo-component-schedule-meeting', delegationOptions);
+}
+
+// @language=typescript
+// src/app.ts
+
+HelloWorldIntent() {
+    const delegationOptions: ComponentDelegationOptions = {
+        onCompletedIntent: 'HelloWorldIntent',
+        data: {
+            email: 'xyz@jovo.tech'
+        }
+    };
+
+    this.delegate('jovo-component-schedule-meeting', delegationOptions);
+}
 ```
 
 At that point the component will go through the necessary steps to fulfill the task and route back to your specified intent with a response.
@@ -129,7 +168,16 @@ const delegationOptions = {
     }
 };
 
-this.delegate('ScheduleMeeting', delegationOptions);
+this.delegate('jovo-component-schedule-meeting', delegationOptions);
+
+// @language=typescript
+const delegationOptions: ComponentDelegationOptions = {
+    data: {
+        email: 'xyz@jovo.tech'
+    }
+};
+
+this.delegate('jovo-component-schedule-meeting', delegationOptions);
 ```
 
 ## $response
@@ -151,7 +199,15 @@ const response = {
     data: {
         phoneNumber: '0123456789'
     },
-}
+};
+
+// @language=typescript
+const response: ComponentResponse = {
+    status: 'SUCCESSFUL',
+    data: {
+        phoneNumber: '0123456789'
+    },
+};
 ```
 
 In your `onCompletedIntent` you have to be prepared to handle all three possible statuses of a response:
@@ -159,7 +215,22 @@ In your `onCompletedIntent` you have to be prepared to handle all three possible
 ```js
 // @language=javascript
 CompletedIntent() {
-    const response = this.$components.GetPhoneNumber.$response;
+    const response = this.$components['jovo-component-get-phone-number'].$response;
+
+    if (response.status === 'REJECTED') {
+        // handle REJECTED
+    }
+    else if (response.status === 'ERROR') {
+        // handle ERROR
+    }
+    else {
+        // handle SUCCESSFUL
+    }
+}
+
+// @language=typescript
+CompletedIntent() {
+    const response = this.$components['jovo-component-get-phone-number'].$response;
 
     if (response.status === 'REJECTED') {
         // handle REJECTED

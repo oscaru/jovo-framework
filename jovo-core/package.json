@@ -1,14 +1,15 @@
 {
   "name": "jovo-core",
-  "version": "2.2.13",
-  "description": " ",
+  "version": "3.0.15",
+  "description": "jovo-core",
   "main": "dist/src/index",
   "types": "dist/src/index.d.ts",
   "scripts": {
+    "prettier": "prettier --config ./.prettierrc.js --write \"{test,src}/**/*\" --list-different",
     "tslint": "tslint -p tsconfig.json -c tslint.json",
+    "rimraf": "rimraf ./dist",
     "tsc": "tsc",
     "tscw": "tsc --watch",
-    "rimraf": "rimraf ./dist",
     "typedoc": "typedoc --out ./docs --mode file",
     "test": "jest"
   },
@@ -16,39 +17,42 @@
   "license": "Apache-2.0",
   "dependencies": {
     "asyncctx": "^2.0.3",
+    "axios": "^0.19.0",
+    "i18next": "^19.0.2",
     "lodash.camelcase": "^4.3.0",
     "lodash.clonedeep": "^4.5.0",
     "lodash.get": "^4.4.2",
     "lodash.isequal": "^4.5.0",
     "lodash.map": "^4.6.0",
     "lodash.mapvalues": "^4.6.0",
-    "lodash.merge": "^4.6.1",
+    "lodash.merge": "^4.6.2",
     "lodash.sample": "^4.2.1",
     "lodash.set": "^4.3.2",
     "lodash.transform": "^4.6.0"
   },
   "devDependencies": {
+    "@types/axios": "^0.14.0",
     "@types/jest": "^24.0.11",
     "@types/lodash.camelcase": "^4.3.4",
     "@types/lodash.clonedeep": "^4.5.4",
     "@types/lodash.get": "^4.4.6",
     "@types/lodash.isequal": "^4.5.3",
     "@types/lodash.map": "^4.6.13",
-    "@types/lodash.mapvalues": "^4.6.4",
+    "@types/lodash.mapvalues": "^4.6.6",
     "@types/lodash.merge": "^4.6.6",
     "@types/lodash.sample": "^4.2.4",
     "@types/lodash.set": "^4.3.6",
     "@types/lodash.transform": "^4.6.4",
     "@types/node": "^10.3.1",
-    "jest": "^24.9.0",
-    "prettier": "1.17.1",
+    "jest": "^25.1.0",
+    "prettier": "2.0.2",
     "rimraf": "^2.6.2",
     "source-map-support": "^0.5.8",
-    "ts-jest": "^24.0.1",
+    "ts-jest": "^25.4.0",
     "tslint": "^5.17.0",
     "tslint-config-prettier": "^1.18.0",
-    "typedoc": "^0.15.0",
-    "typescript": "^3.4.1"
+    "typedoc": "^0.15.6",
+    "typescript": "^3.8.3"
   },
   "jest": {
     "transform": {
@@ -69,5 +73,5 @@
   "files": [
     "dist/src/**/*"
   ],
-  "gitHead": "02550b3546066635c8a821c8eb3266c3fef8940c"
+  "gitHead": "85f493970553e479edcee02ad7037f617dd74fcd"
 }

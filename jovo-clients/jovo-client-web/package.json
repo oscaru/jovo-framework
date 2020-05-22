@@ -1,0 +1,68 @@
+{
+  "name": "jovo-client-web",
+  "version": "3.0.22",
+  "description": " ",
+  "main": "dist/index.common.js",
+  "browser": "dist/index.umd.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "prettier": "prettier --config ./.prettierrc.js --write \"{test,src}/**/*\" --list-different",
+    "build": "webpack --mode production",
+    "rimraf": "",
+    "watch": "webpack --mode development --watch",
+    "analyze": "webpack --mode production --env.ANALYZE_BUNDLE=true",
+    "tslint": "tslint -p tsconfig.json -c tslint.json",
+    "typedoc": "typedoc --out ./docs --mode file",
+    "test": "jest"
+  },
+  "author": "jovotech",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "lodash.get": "^4.4.2",
+    "lodash.merge": "^4.6.2",
+    "lodash.set": "^4.3.2",
+    "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.11",
+    "@types/lodash.get": "^4.4.6",
+    "@types/lodash.merge": "^4.6.6",
+    "@types/lodash.set": "^4.3.6",
+    "@types/markdown-it": "^0.0.8",
+    "@types/uuid": "^3.4.4",
+    "jest": "^25.1.0",
+    "jovo-platform-core": "^3.0.17",
+    "prettier": "2.0.2",
+    "rimraf": "^2.6.2",
+    "source-map-support": "^0.5.8",
+    "ts-jest": "^25.4.0",
+    "ts-loader": "^6.2.1",
+    "tslint": "^5.17.0",
+    "tslint-config-prettier": "^1.18.0",
+    "typedoc": "^0.15.6",
+    "typescript": "^3.8.3",
+    "webpack": "^4.41.5",
+    "webpack-bundle-analyzer": "^3.6.0",
+    "webpack-cli": "^3.3.10"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testURL": "http://localhost/",
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
+    "testPathIgnorePatterns": [
+      "/dist/"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "json"
+    ]
+  },
+  "files": [
+    "dist"
+  ],
+  "gitHead": "270ef9aeb54c4b1eb274536044a5535d1d636654"
+}

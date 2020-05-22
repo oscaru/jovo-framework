@@ -12,14 +12,23 @@ import {
   Platform,
   TestSuite,
 } from 'jovo-core';
-import { Cards, SapCaiCore, SapCaiNLU, SapCaiRequestBuilder, SapCaiResponseBuilder, SapCaiSkill } from '.';
+import {
+  Cards,
+  SapCaiCore,
+  SapCaiNlu,
+  SapCaiRequest,
+  SapCaiRequestBuilder,
+  SapCaiResponse,
+  SapCaiResponseBuilder,
+  SapCaiSkill,
+} from '.';
 
 export interface Config extends ExtensibleConfig {
   handlers?: any; //tslint:disable-line:no-any
   useLaunch?: boolean;
 }
 
-export class SapCai extends Extensible implements Platform {
+export class SapCai extends Platform<SapCaiRequest, SapCaiResponse> {
   requestBuilder = new SapCaiRequestBuilder();
   responseBuilder = new SapCaiResponseBuilder();
 
@@ -36,11 +45,6 @@ export class SapCai extends Extensible implements Platform {
     if (config) {
       this.config = _merge(this.config, config);
     }
-
-    this.actionSet = new ActionSet(
-      ['$init', '$request', '$session', '$user', '$type', '$nlu', '$inputs', '$output', '$response'],
-      this,
-    );
   }
 
   getAppType(): string {
@@ -49,6 +53,7 @@ export class SapCai extends Extensible implements Platform {
 
   install(app: BaseApp) {
     app.$platform.set(this.constructor.name, this);
+    app.middleware('setup')!.use(this.setup.bind(this));
     app.middleware('platform.init')!.use(this.initialize.bind(this));
     app.middleware('platform.nlu')!.use(this.nlu.bind(this));
     app.middleware('platform.output')!.use(this.output.bind(this));
@@ -66,36 +71,35 @@ export class SapCai extends Extensible implements Platform {
       }
     });
 
-    this.use(new SapCaiCore(), new SapCaiNLU(), new Cards());
+    this.use(new SapCaiCore(), new SapCaiNlu(), new Cards());
 
     Jovo.prototype.$caiSkill = undefined;
-    Jovo.prototype.caiSkill = function() {
+    Jovo.prototype.caiSkill = function () {
       if (this.constructor.name !== 'SapCaiSkill') {
         throw Error(`Can't handle request. Please use this.isCaiSkill()`);
       }
       return this as SapCaiSkill;
     };
-    Jovo.prototype.isCaiSkill = function() {
+    Jovo.prototype.isCaiSkill = function () {
       return this.constructor.name === 'SapCaiSkill';
     };
 
     //tslint:disable-next-line:no-any
-    BaseApp.prototype.setCaiHandler = function(...handlers: any[]) {
+    BaseApp.prototype.setCaiHandler = function (...handlers: any[]) {
       // tslint:disable-line
       for (const obj of handlers) {
         // eslint-disable-line
         if (typeof obj !== 'object') {
           throw new Error('Handler must be of type object.');
         }
-        const sourceHandler = _get(this.config.plugin, 'SapCai.handlers');
-        _set(this.config.plugin, 'SapCai.handlers', _merge(sourceHandler, obj));
+        const sourceHandler = _get(this.config, 'plugin.SapCai.handlers');
+        _set(this.config, 'plugin.SapCai.handlers', _merge(sourceHandler, obj));
       }
       return this;
     };
   }
 
-  // tslint:disable-next-line:no-any
-  makeTestSuite(): any {
+  makeTestSuite(): TestSuite<SapCaiRequestBuilder, SapCaiResponseBuilder> {
     return new TestSuite(new SapCaiRequestBuilder(), new SapCaiResponseBuilder());
   }
 

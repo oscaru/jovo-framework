@@ -23,8 +23,8 @@
                             "route": "installation/upgrading"
                         },
                         {
-                            "title": "Migrating from v1",
-                            "route": "installation/v1-migration"
+                            "title": "Migrating from v2",
+                            "route": "installation/v2-migration"
                         }
                     ]
                 },
@@ -59,11 +59,11 @@
                             "route": "requests-responses"
                         },
                         {
-                            "title": "Request Object",
+                            "title": "$request Object",
                             "route": "requests-responses/request"
                         },
                         {
-                            "title": "Response Object",
+                            "title": "$response Object",
                             "route": "requests-responses/response"
                         }
                     ]
@@ -143,7 +143,7 @@
                             "route": "output/visual-output"
                         },
                         {
-                            "title": "Output Object",
+                            "title": "$output Object",
                             "route": "output/object"
                         }
                     ]
@@ -162,37 +162,24 @@
                     "route": "project-lifecycle"
                 },
                 {
-                    "title": "Jovo Webhook",
-                    "route": "jovo-webhook"
+                    "title": "Local Development",
+                    "route": "local-development"
                 },
                 {
-                    "title": "CLI Commands",
-                    "content": [
-                        {
-                            "title": "Jovo CLI",
-                            "route": "cli"
-                        },
-                        {
-                            "title": "new",
-                            "route": "cli/new"
-                        },
-                        {
-                            "title": "run",
-                            "route": "cli/run"
-                        },
-                        {
-                            "title": "build",
-                            "route": "cli/build"
-                        },
-                        {
-                            "title": "deploy",
-                            "route": "cli/deploy"
-                        },
-                        {
-                            "title": "get",
-                            "route": "cli/get"
-                        }
-                    ]
+                    "title": "Deployment",
+                    "route": "deployment"
+                },
+                {
+                    "title": "Staging",
+                    "route": "staging"
+                },
+                {
+                    "title": "Debugging",
+                    "route": "debugging"
+                },
+                {
+                    "title": "Unit Testing",
+                    "route": "unit-testing"
                 }
             ]
         },
@@ -241,6 +228,10 @@
                         {
                             "title": "Azure Functions",
                             "route": "hosting/azure-functions"
+                        },
+                        {
+                            "title": "HTTP Host",
+                            "route": "hosting/http-host"
                         }
                     ]
                 }
@@ -314,7 +305,7 @@
                         },
                         {
                             "title": "Amazon Pay",
-                            "route": "amazon-alexa/pay"
+                            "route": "amazon-alexa/amazon-pay"
                         }
                     ]
                 },
@@ -358,6 +349,27 @@
                 {
                     "title": "Dialogflow Integrations",
                     "route": "dialogflow-integrations"
+                },
+                {
+                    "title": "Samsung Bixby",
+                    "content": [
+                        {
+                            "title": "Overview",
+                            "route": "samsung-bixby"
+                        },
+                        {
+                            "title": "Audioplayer Capsules",
+                            "route": "samsung-bixby/audioplayer"
+                        }
+                    ]
+                },
+                {
+                    "title": "Twilio Autopilot",
+                    "route": "twilio-autopilot"
+                },
+                {
+                    "title": "Facebook Messenger",
+                    "route": "facebook-messenger"
                 }
             ]
         },
@@ -434,10 +446,6 @@
                             "route": "analytics/dashbot"
                         },
                         {
-                            "title": "Bespoken",
-                            "route": "analytics/bespoken"
-                        },
-                        {
                             "title": "Chatbase",
                             "route": "analytics/chatbase"
                         },
@@ -446,27 +454,140 @@
                             "route": "analytics/botanalytics"
                         },
                         {
-                            "title": "VoiceHero",
-                            "route": "analytics/voicehero"
+                            "title": "Google Analytics",
+                            "route": "analytics/googleanalytics"
+                        }
+                    ]
+                },
+                {
+                    "title": "ASR",
+                    "content": [
+                        {
+                            "title": "Overview",
+                            "route": "asr"
+                        },
+                        {
+                            "title": "Google Cloud ASR",
+                            "route": "asr/google-cloud"
+                        },
+                        {
+                            "title": "Microsoft Azure ASR",
+                            "route": "asr/microsoft-azure"
+                        }
+                    ]
+                },
+                {
+                    "title": "NLU",
+                    "content": [
+                        {
+                            "title": "Overview",
+                            "route": "nlu"
+                        },
+                        {
+                            "title": "Microsoft LUIS",
+                            "route": "nlu/microsoft-luis"
+                        },
+                        {
+                            "title": "Dialogflow",
+                            "route": "nlu/google-dialogflow"
+                        }
+                    ]
+                },
+                {
+                    "title": "SLU",
+                    "content": [
+                        {
+                            "title": "Overview",
+                            "route": "slu"
+                        },
+                        {
+                            "title": "Amazon Lex",
+                            "route": "slu/amazon-lex"
+                        },
+                        {
+                            "title": "Wit.ai",
+                            "route": "slu/witai"
+                        }
+                    ]
+                },
+                {
+                    "title": "TTS",
+                    "content": [
+                        {
+                            "title": "Text-to-Speech (TTS)",
+                            "route": "tts"
+                        },
+                        {
+                            "title": "Amazon Polly",
+                            "route": "tts/amazon-polly"
+                        },
+                        {
+                            "title": "Google Cloud",
+                            "route": "tts/google-cloud"
+                        },
+                        {
+                            "title": "Microsoft Azure",
+                            "route": "tts/microsoft-azure"
                         }
                     ]
                 }
             ]
         },
-        {       
-            "title": "Testing",
+        {
+            "title": "Tools",
             "content": [
                 {
                     "title": "Overview",
-                    "route": "testing"
+                    "route": "tools"
+                },
+                {
+                    "title": "Jovo CLI",
+                    "content": [
+                        {
+                            "title": "Jovo CLI",
+                            "route": "cli"
+                        },
+                        {
+                            "title": "new",
+                            "route": "cli/new"
+                        },
+                        {
+                            "title": "run",
+                            "route": "cli/run"
+                        },
+                        {
+                            "title": "build",
+                            "route": "cli/build"
+                        },
+                        {
+                            "title": "deploy",
+                            "route": "cli/deploy"
+                        },
+                        {
+                            "title": "get",
+                            "route": "cli/get"
+                        },
+                        {
+                            "title": "update",
+                            "route": "cli/update"
+                        }
+                    ]
+                },
+                {
+                    "title": "Jovo Webhook",
+                    "route": "webhook"
                 },
                 {
                     "title": "Jovo Debugger",
                     "route": "debugger"
                 },
                 {
-                    "title": "Unit Testing",
-                    "route": "unit-testing"
+                    "title": "Jovo Audio Converter",
+                    "route": "audio-converter"
+                },
+                {
+                    "title": "Jovo Chrome Extension",
+                    "route": "chrome-extension"
                 }
             ]
         },
@@ -490,10 +611,6 @@
                     "route": "plugins"
                 },
                 {
-                    "title": "Contributing",
-                    "route": "contributing"
-                },
-                {
                     "title": "Conversational Components",
                     "content": [
                         {
@@ -509,6 +626,10 @@
                             "route": "components/developing-components"
                         }
                     ]
+                },
+                {
+                    "title": "Contributing",
+                    "route": "contributing"
                 }
             ]
         }

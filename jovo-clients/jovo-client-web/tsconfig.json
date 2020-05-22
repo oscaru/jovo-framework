@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "es2017",
+      "es2015",
+      "dom"
+    ],
+    "module": "commonjs",
+    "noImplicitAny": true,
+    "removeComments": false,
+    "allowUnreachableCode": false,
+    "resolveJsonModule": true,
+    "noImplicitReturns": true,
+    "preserveConstEnums": true,
+    "declaration": true,
+    "strict": true,
+    "outDir": "./dist",
+    "target": "es5",
+    "sourceMap": true
+  },
+  "include": [
+    "**/*.d.ts",
+    "src/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "test"
+  ]
+}

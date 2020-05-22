@@ -1,14 +1,17 @@
-const config = {
-   logging: true,
+import { config } from 'jovo-framework';
 
-   intentMap: {
-      'AMAZON.StopIntent': 'END',
-   },
-    db: {
-        FileDb: {
-            pathToFile: './../../db/db.json'
-        }
-    },
-};
-
-export = config;
+// tslint:disable-next-line
+export = config({
+	logging: false,
+	user: {
+		metaData: true
+	},
+	intentMap: {
+		'AMAZON.StopIntent': 'END'
+	},
+	db: {
+		FileDb: {
+			pathToFile: './../../db/db.json'
+		}
+	}
+});

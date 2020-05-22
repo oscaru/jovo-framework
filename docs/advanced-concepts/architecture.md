@@ -10,7 +10,7 @@ Learn more about the modular architecture of the Jovo Framework.
 
 ## Introduction
 
-Since `v2`, the Jovo Framework has a flexible and extensible architecture that is split into different modules.
+The Jovo Framework has a flexible and extensible architecture that is split into different modules.
 
 With every [request and response](../basic-concepts/requests-responses './requests-responses') interaction pair, the framework runs through the following process:
 

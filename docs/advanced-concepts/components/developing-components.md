@@ -2,15 +2,14 @@
 
 Get an overview on how to develop your own Conversational Components.
 
-* [Developing Conversational Components](#developing-conversational-components)
-  * [Handler](#handler)
-  * [Configuration](#configuration)
-  * [Models](#models)
-  * [i18n](#i18n)
-  * [Components using Components](#components-using-components)
-    * [Installation](#installation)
-    * [Configuration](#configuration-1)
-    * [General Usage](#general-usage)
+* [Handler](#handler)
+* [Configuration](#configuration)
+* [Models](#models)
+* [i18n](#i18n)
+* [Components using Components](#components-using-components)
+  * [Installation](#installation)
+  * [Configuration of Nested Components](#configuration-of-nested-components)
+  * [General Usage](#general-usage)
 
 You're component has to have the whole package of language model, handler, configuration and i18n for people to be able to use it. We will skip, the general description of each of these blocks and go into more detail about the small stuff that's important to develop components. You can revisit the basics [here](./README.md 'components').
 
@@ -18,34 +17,63 @@ You're component has to have the whole package of language model, handler, confi
 
 ## Handler
 
-The component's handler has to be inside a state, which is named after the component, so you don't overwrite any of the user's own intents:
+The component's handler has to have a `START` intent at its root, which the system will route to on delegation. That intent can be used to initialize any kind of data you will need throughout the component as well as begin the conversation with the user:
 
 ```js
 // @language=javascript
 // src/handler.js
 
 module.exports = {
-    GetPhoneNumber: {
-        // intents and states
+    START() {
+        // initialize object which will be used to store session attributes needed for the component,
+        // so we don't overlap with the user's existing session attributes
+        this.$session.$data.[this.getActiveComponent().name] = {};
+        this.$speech.t('start');
+
+        this.ask(this.$speech);
     }
 };
+
+// @language=typescript
+// src/handler.ts
+
+const phoneNumberHandler: Handler = {
+    START() {
+        // initialize object which will be used to store session attributes needed for the component,
+        // so we don't overlap with the user's existing session attributes
+        this.$session.$data[this.getActiveComponent()!.name] = {};
+        this.$speech.t('start');
+
+        this.ask(this.$speech);
+    }
+};
+
+export {phoneNumberHandler}; 
 ```
 
-Also, every component has to have a `START` intent at its root, which the system will route to on delegation. That intent can be used to initialize any kind of data you will need throughout the component as well as begin the conversation with the user:
+In the `START` intent you should check if the user has parsed existing data to your component. In the following example, the component checks whether the user has parsed an existing phone number:
 
 ```js
 // @language=javascript
 // src/handler.js
 
 module.exports = {
-    GetPhoneNumber: {
-        START() {
-            // initialize COMPONENT_GetPhoneNumber object which will be used to store session attributes needed for the component,
-            // so we don't overlap with the user's existing session attributes
-            this.$session.$data.COMPONENT_GetPhoneNumber = {};
-            this.$speech.t('start');
+    START() {
+        // ...
+        if (this.getActiveComponent()!.data.phoneNumber) {
+            // handle case
+        }
+    }
+};
 
-            this.ask(this.$speech);
+// @language=typescript
+// src/handler.ts
+
+const phoneNumberHandler: Handler = {
+    START() {
+        // ...
+        if (this.getActiveComponent()!.data.phoneNumber) {
+            // handle case
         }
     }
 };
@@ -62,6 +90,16 @@ Name | Description | Value | Required
 ```js
 // @language=javascript
 const response = {
+    status: 'SUCCESSFUL',
+    data: {
+        phoneNumber: '0123456789'
+    }
+};
+
+this.sendComponentResponse(response);
+
+// @language=typescript
+const response: ComponentResponse = {
     status: 'SUCCESSFUL',
     data: {
         phoneNumber: '0123456789'
@@ -99,6 +137,30 @@ ON_ERROR() {
 Unhandled() {
     return this.toIntent('HelpIntent');
 },
+
+// @language=typescript
+// src/handler.ts
+
+END() {
+    const response: ComponentResponse = {
+        status: 'REJECTED',
+    };
+
+    this.sendComponentResponse(response);
+},
+
+ON_ERROR() {
+    const response: ComponentResponse = {
+        status: 'ERROR',
+        error: this.$handleRequest.error;
+    };
+
+    this.sendComponentResponse(response);
+},
+
+Unhandled() {
+    return this.toIntent('HelpIntent');
+},
 ```
 
 ## Configuration
@@ -107,7 +169,7 @@ Specify the component's default configuration in its `config.js` file. There's n
 
 ```js
 // @language=typescript
-// config.ts
+// src/config.ts
 import { ComponentConfig } from 'jovo-framework';
 
 interface SurveyConfig extends ComponentConfig {
@@ -117,13 +179,31 @@ interface SurveyConfig extends ComponentConfig {
 const config: SurveyConfig = {
     intentMap: {
         'AMAZON.HelpIntent': 'HelpIntent',
+        'AMAZON.NoIntent': 'NoIntent',
         'AMAZON.StopIntent': 'END',
-        'StopIntent': 'END'
+        'StopIntent': 'END',
+        'AMAZON.YesIntent': 'YesIntent'
     },
     numberOfQuestions: 3
 };
 
 export {SurveyConfig, config as Config};
+
+// @language=javascript
+// src/config.js
+
+const config = {
+    intentMap: {
+        'AMAZON.HelpIntent': 'HelpIntent',
+        'AMAZON.NoIntent': 'NoIntent',
+        'AMAZON.StopIntent': 'END',
+        'StopIntent': 'END',
+        'AMAZON.YesIntent': 'YesIntent'
+    },
+    numberOfQuestions: 3
+};
+
+module.exports = config;
 ```
 
 ## Models
@@ -228,15 +308,30 @@ export class TestComponent1 extends ComponentPlugin {
 
     constructor(config?: PluginConfig) {
         super(config);
+        // ...
 
         this.useComponents(new TestComponent2());
     }
 }
+
+// @language=javascript
+// index.js
+
+class TestComponent1 extends ComponentPlugin {
+    constructor(config) {
+        super(config);
+        // ...
+
+        this.useComponents(new TestComponent2());
+    }
+}
+
+module.exports = GetPhoneNumber; 
 ```
 
 With all these set, the Jovo CLI and framework will load your component's component's files on `load` and add it to the project's active components.
 
-### Configuration
+### Configuration of Nested Components
 
 Configuration of n-th layer components work in a strict hierarchy. Let's say we have two components: component A and component B, where component A uses B.
 
@@ -245,8 +340,8 @@ At the very bottom of our configuration is component B's own default configurati
 Component A adds its configuration using its own config file using the name of component B:
 
 ```js
-// @language=javascript
-// component A config.js
+// @language=typescript
+// component A config.ts
 
 import { ComponentConfig } from 'jovo-framework';
 import { TestComponent2Config } from 'TestComponent2';
@@ -269,32 +364,61 @@ const config: SurveyConfig = {
 };
 
 export {SurveyConfig, config as Config};
+
+// @language=javascript
+// component A config.js
+
+const config = {
+    intentMap: {
+        'AMAZON.HelpIntent': 'HelpIntent',
+        'AMAZON.NoIntent': 'NoIntent',
+        'AMAZON.StopIntent': 'END',
+        'StopIntent': 'END',
+        'AMAZON.YesIntent': 'YesIntent'
+    },
+    numberOfFails: 3,
+    TestComponent2: {
+        // ...
+    }
+};
+
+module.exports = config;
 ```
 
 Now, the only one left is the end user, who can also make changes. Their configuration will merged as the very last, which means it can overwrite anything.
 
 ```js
+// @language=javascript
 // user's project's config.js
 
 module.exports = {
-   logging: true,
-    intentMap: {
-        'AMAZON.HelpIntent': 'HelpIntent',
-    },
-    db: {
-        FileDb: {
-            pathToFile: './../db/db.json'
-        }
-    },
+    // ...
     components: {
         TestComponent1: {
             // TestComponent1 configuration
             TestComponent2: {
-                // configuration of TestComponent2
+                // TestComponent2 configuration
             }
         }
     }
 };
+
+// @language=typescript
+// user's project's config.ts
+
+const config = {
+    // ...
+    components: {
+        TestComponent1: {
+            // TestComponent1 configuration
+            TestComponent2: {
+                // TestComponent2 configuration
+            }
+        }
+    }
+};
+
+export = config;
 ```
 
 The deeper the nesting of components using components, the deeper the configuration will be as well.
